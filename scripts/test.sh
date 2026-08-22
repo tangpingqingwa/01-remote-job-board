@@ -125,6 +125,34 @@ if [[ -f package.json ]]; then
     fail "live board must not invent company listings"
   fi
 
+  echo "== about and rules pages =="
+  for f in src/app/about/page.tsx src/app/rules/page.tsx tests/pages.test.ts; do
+    [[ -f "$f" ]] || fail "missing $f"
+    [[ -s "$f" ]] || fail "empty $f"
+  done
+  grep -q 'href="/about"' src/app/layout.tsx || fail "board nav must link to /about"
+  grep -q 'href="/rules"' src/app/layout.tsx || fail "board nav must link to /rules"
+  for page in src/app/about/page.tsx src/app/rules/page.tsx; do
+    grep -q 'Rank is the bid' "$page" || fail "$page must state rank is the bid"
+    grep -q '\$5' "$page" || fail "$page must state min \$5"
+    grep -q 'older' "$page" || fail "$page must state older wins ties"
+    grep -q 'difference' "$page" || fail "$page must state raise pays the difference"
+  done
+  grep -q 'no ads' src/app/about/page.tsx || fail "about must state no ads"
+  grep -q 'no API keys' src/app/about/page.tsx || fail "about must state no API keys"
+  grep -q 'no revenue share' src/app/about/page.tsx || fail "about must state no revenue share"
+  grep -q 'global remote' src/app/about/page.tsx || fail "about must state global remote"
+  grep -q '≥ $5' src/app/rules/page.tsx || fail "rules must state min $5"
+  grep -q '$50,000' src/app/rules/page.tsx || fail "rules must state max $50,000"
+  grep -q 'Monday 00:00' src/app/rules/page.tsx || fail "rules must state weekly UTC reset"
+  grep -q 'never invent salaries' src/app/rules/page.tsx || fail "rules must forbid invented salaries"
+  grep -q 'newBid − currentBid' src/app/rules/page.tsx || fail "rules must state raise-the-difference"
+  grep -q 'Telegram' src/app/rules/page.tsx || fail "rules must document chat-link rejects"
+  grep -q 'NSFW' src/app/rules/page.tsx || fail "rules must document NSFW rejects"
+  if [[ -f src/lib/urls.ts ]] || [[ -f tests/urls.test.ts ]]; then
+    fail "PR 5 must not start anti-spam URL rules"
+  fi
+
   echo "== install =="
   if [[ ! -d node_modules ]]; then
     if [[ -f package-lock.json ]]; then
