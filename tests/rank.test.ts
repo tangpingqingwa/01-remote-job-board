@@ -115,6 +115,7 @@ test("cards render rank, title, company, $bid, and click count", () => {
   assert.match(html, /Acme/);
   assert.match(html, /\$21/);
   assert.match(html, /9 clicks/);
+  assert.match(html, /href="\/out\/lst_acme"/);
   assert.doesNotMatch(html, /\$0|competitive/i);
 });
 

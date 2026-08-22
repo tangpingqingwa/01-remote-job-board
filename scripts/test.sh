@@ -167,8 +167,47 @@ if [[ -f package.json ]]; then
   if grep -nE '[^a-zA-Z_]fetch\(' src/lib/urls.ts >/dev/null; then
     fail "urls.ts must not call global fetch (tests stay offline)"
   fi
-  if [[ -f src/lib/period.ts ]] || [[ -f src/app/out/\[id\]/route.ts ]]; then
-    fail "PR 6 must not start weekly reset + clicks"
+  echo "== weekly reset + public apply clicks =="
+  for f in src/lib/period.ts src/app/out/\[id\]/route.ts tests/period.test.ts; do
+    [[ -f "$f" ]] || fail "missing $f"
+    [[ -s "$f" ]] || fail "empty $f"
+  done
+  grep -q 'export function isoWeekPeriodId' src/lib/period.ts \
+    || fail "period.ts must export isoWeekPeriodId"
+  grep -q 'export function currentPeriodMeta' src/lib/period.ts \
+    || fail "period.ts must export currentPeriodMeta"
+  grep -q 'export function resolveBoardPeriod' src/lib/period.ts \
+    || fail "period.ts must resolve ?period= closed weeks"
+  grep -q 'Monday' src/lib/period.ts \
+    || fail "period.ts must document Monday 00:00 UTC"
+  grep -q 'export async function GET' src/app/out/\[id\]/route.ts \
+    || fail "click route must export GET"
+  grep -q 'NextResponse.redirect' src/app/out/\[id\]/route.ts \
+    || fail "click route must 302 to the apply URL"
+  grep -q 'incrementClicks' src/app/out/\[id\]/route.ts \
+    || fail "click route must increment public clicks"
+  grep -q 'outboundApplyUrl' src/app/out/\[id\]/route.ts \
+    || fail "click route must use the canonical outbound URL"
+  grep -q 'resolveBoardPeriod' src/app/page.tsx \
+    || fail "board must resolve the period via resolveBoardPeriod"
+  grep -q 'params.period' src/app/page.tsx \
+    || fail "board must accept ?period="
+  grep -q 'getLiveBoardListings' src/lib/board.ts \
+    || fail "board.ts must expose getLiveBoardListings"
+  grep -q 'href={applyClickPath' src/components/board/listing-card.tsx \
+    || fail "listing card must link Apply through /out/:id"
+  grep -q 'data-clicks' src/components/board/listing-card.tsx \
+    || fail "listing card must show public clicks"
+  grep -q 'Monday 00:00 UTC' tests/period.test.ts \
+    || fail "period tests must cover Monday 00:00 UTC"
+  grep -q 'getLiveBoardListings' tests/period.test.ts \
+    || fail "period tests must drop old bids from the live query"
+  grep -q '/out/' tests/period.test.ts \
+    || fail "period tests must cover GET /out/:id"
+  grep -q '302' tests/period.test.ts \
+    || fail "period tests must assert the 302 hop"
+  if [[ -f scripts/live-smoke.sh ]]; then
+    fail "PR 7 must not start live-smoke"
   fi
 
   echo "== install =="

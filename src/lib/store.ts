@@ -43,6 +43,14 @@ export class BoardStore {
     }
     this.listings[index] = listing;
   }
+
+  incrementClicks(id: string): Listing | undefined {
+    const listing = this.getById(id);
+    if (!listing) return undefined;
+    const updated: Listing = { ...listing, clicks: listing.clicks + 1 };
+    this.updatePaid(updated);
+    return updated;
+  }
 }
 
 export const defaultBoardStore = new BoardStore();
