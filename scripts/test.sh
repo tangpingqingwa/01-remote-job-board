@@ -73,6 +73,26 @@ if [[ -f package.json ]]; then
     [[ -f "$f" ]] || fail "missing $f"
     [[ -s "$f" ]] || fail "empty $f"
   done
+
+  echo "== polar checkout files =="
+  for f in src/payments/port.ts src/payments/fixture.ts src/payments/polar.ts \
+    src/app/return/page.tsx tests/checkout.test.ts; do
+    [[ -f "$f" ]] || fail "missing $f"
+    [[ -s "$f" ]] || fail "empty $f"
+  done
+  grep -q 'export class FakePolarPort' src/payments/fixture.ts \
+    || fail "fixture.ts must export FakePolarPort"
+  grep -q 'createCheckout' src/payments/port.ts \
+    || fail "port.ts must define createCheckout"
+  grep -q 'POLAR_FIXTURE_ONLY' src/payments/env.ts \
+    || fail "env.ts must honor POLAR_FIXTURE_ONLY"
+  grep -q 'on the board' src/app/return/page.tsx \
+    || fail "return page must show success copy"
+  grep -q 'No rank claimed' src/app/return/page.tsx \
+    || fail "return page must show cancel copy"
+  if grep -nE 'fetch\(|polar\.sh|api\.polar' src/payments/fixture.ts src/payments/port.ts >/dev/null; then
+    fail "fixture/port must not call Polar over the network"
+  fi
   grep -q 'export function rankListings' src/lib/rank.ts \
     || fail "rank.ts must export rankListings"
   grep -q 'Outbid' src/components/board/bid-form.tsx \

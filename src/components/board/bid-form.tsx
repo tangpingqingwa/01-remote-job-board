@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import type { FunctionLane } from "../../lib/types";
 import { MAX_BID_USD, MIN_BID_USD } from "../../lib/types";
 
@@ -17,13 +17,15 @@ function clampAmount(value: number): number {
 export function BidForm({ lane, defaultAmount }: BidFormProps) {
   const [amount, setAmount] = useState(() => clampAmount(defaultAmount));
 
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-  }
-
   return (
     <section className="claim" id="claim">
-      <form data-bid-form="" data-lane={lane} onSubmit={onSubmit}>
+      <form
+        action="/checkout"
+        method="post"
+        data-bid-form=""
+        data-lane={lane}
+      >
+        <input type="hidden" name="lane" value={lane} />
         <h2>
           <span>Claim #1 for</span>
           <label className="amount-field">
@@ -60,9 +62,6 @@ export function BidForm({ lane, defaultAmount }: BidFormProps) {
         </div>
         <p className="raise-hint">
           Already on this lane? Enter the same apply URL or handle and raise.
-        </p>
-        <p className="stub-note" data-checkout-stub="">
-          Checkout is not live. No charge and no rank claimed.
         </p>
       </form>
     </section>

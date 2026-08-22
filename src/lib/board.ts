@@ -1,3 +1,4 @@
+import { defaultBoardStore } from "./store";
 import type { FunctionLane, Listing } from "./types";
 import { FUNCTION_LANES } from "./types";
 
@@ -56,10 +57,10 @@ export function nextMondayUtc(now: Date): Date {
   return next;
 }
 
-/** Live board has no paid rows until checkout lands. Never invent jobs. */
+/** Paid listings only. Unpaid or abandoned checkouts never appear. */
 export function getBoardListings(
-  _lane: FunctionLane,
-  _periodId: string,
+  lane: FunctionLane,
+  periodId: string,
 ): Listing[] {
-  return [];
+  return defaultBoardStore.listPaid(lane, periodId);
 }
