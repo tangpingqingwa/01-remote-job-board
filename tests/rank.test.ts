@@ -143,6 +143,7 @@ test("board chrome has lane tabs, identity field, amount, and Outbid", () => {
   assert.match(html, /Apply URL or company handle/);
   assert.match(html, /name="amount"/);
   assert.match(html, />Outbid</);
+  assert.match(html, /action="\/checkout"/);
   assert.match(html, /data-empty-lane="true"/);
   assert.match(html, /2026-W34/);
 });
