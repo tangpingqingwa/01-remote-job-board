@@ -144,8 +144,31 @@ if [[ -f package.json ]]; then
   grep -q 'newBid − currentBid' src/app/rules/page.tsx || fail "rules must state raise-the-difference"
   grep -q 'Telegram' src/app/rules/page.tsx || fail "rules must document chat-link rejects"
   grep -q 'NSFW' src/app/rules/page.tsx || fail "rules must document NSFW rejects"
-  if [[ -f src/lib/urls.ts ]] || [[ -f tests/urls.test.ts ]]; then
-    fail "PR 5 must not start anti-spam URL rules"
+
+  echo "== anti-spam URL rules =="
+  for f in src/lib/urls.ts tests/urls.test.ts; do
+    [[ -f "$f" ]] || fail "missing $f"
+    [[ -s "$f" ]] || fail "empty $f"
+  done
+  grep -q 'export function canonicalizeApplyUrl' src/lib/urls.ts \
+    || fail "urls.ts must export canonicalizeApplyUrl"
+  grep -q 'export function outboundApplyUrl' src/lib/urls.ts \
+    || fail "urls.ts must export outboundApplyUrl"
+  for code in invalid_url tracking_stripped_empty chat_link_forbidden \
+    nsfw_forbidden shortener_unresolved; do
+    grep -q "$code" src/lib/urls.ts || fail "urls.ts must emit $code"
+    grep -q "$code" tests/urls.test.ts || fail "url tests must cover $code"
+  done
+  grep -q 'utm_' tests/urls.test.ts || fail "url tests must strip tracking query"
+  grep -q 't.me' tests/urls.test.ts || fail "url tests must reject Telegram"
+  grep -q 'onlyfans' tests/urls.test.ts || fail "url tests must reject NSFW"
+  grep -q 'SHORTENER_FIXTURES\|resolveShortener' tests/urls.test.ts \
+    || fail "url tests must resolve shorteners via fixtures"
+  if grep -nE '[^a-zA-Z_]fetch\(' src/lib/urls.ts >/dev/null; then
+    fail "urls.ts must not call global fetch (tests stay offline)"
+  fi
+  if [[ -f src/lib/period.ts ]] || [[ -f src/app/out/\[id\]/route.ts ]]; then
+    fail "PR 6 must not start weekly reset + clicks"
   fi
 
   echo "== install =="

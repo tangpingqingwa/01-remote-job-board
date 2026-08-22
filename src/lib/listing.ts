@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { FunctionLane, Listing, SalaryBand } from "./types";
 import { MAX_BID_USD, MIN_BID_USD } from "./types";
 import type { BoardStore } from "./store";
+import { canonicalizeApplyUrl, UrlError } from "./urls";
 
 export class CheckoutError extends Error {
   constructor(
@@ -55,9 +56,25 @@ function deriveHandle(identity: string): string {
   return normalizeHandle(trimmed);
 }
 
+function looksLikeAbsoluteUrl(raw: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(raw);
+}
+
+/** Machine SPEC §9 codes stay on CheckoutError so /checkout can redirect. */
+export function listingApplyUrl(raw: string): string {
+  try {
+    return canonicalizeApplyUrl(raw);
+  } catch (error) {
+    if (error instanceof UrlError) {
+      throw new CheckoutError(error.code, error.httpStatus);
+    }
+    throw error;
+  }
+}
+
 function deriveApplyUrl(identity: string, handle: string): string {
   const trimmed = identity.trim();
-  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  if (looksLikeAbsoluteUrl(trimmed)) return listingApplyUrl(trimmed);
   return `https://${handle}.example`;
 }
 
@@ -89,7 +106,11 @@ export function draftFromOutbidInput(input: {
   const identity = input.identity.trim();
   if (!identity) throw new CheckoutError("invalid_listing", 422);
 
-  const companyHandle = deriveHandle(identity);
+  const applyUrl = looksLikeAbsoluteUrl(identity)
+    ? listingApplyUrl(identity)
+    : undefined;
+
+  const companyHandle = deriveHandle(applyUrl ?? identity);
   if (!HANDLE_RE.test(companyHandle)) {
     throw new CheckoutError("invalid_listing", 422);
   }
@@ -110,7 +131,7 @@ export function draftFromOutbidInput(input: {
     title,
     company,
     companyHandle,
-    applyUrl: deriveApplyUrl(identity, companyHandle),
+    applyUrl: applyUrl ?? deriveApplyUrl(identity, companyHandle),
     salary: null,
     bidUsd: input.amountUsd,
     payerId: input.payerId ?? newPayerId(),
@@ -142,6 +163,8 @@ export function planCheckout(
   draft: ListingDraft,
   requestedChargeUsd?: number,
 ): CheckoutPlan {
+  draft.applyUrl = listingApplyUrl(draft.applyUrl);
+
   if (!Number.isInteger(draft.bidUsd) || draft.bidUsd < 1) {
     throw new CheckoutError("invalid_bid", 400);
   }
