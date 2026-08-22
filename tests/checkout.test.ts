@@ -19,6 +19,7 @@ const PERIOD = "2026-W34";
 
 afterEach(() => {
   resetFixtureIds();
+  defaultBoardStore.reset();
 });
 
 function draft(overrides: Partial<ReturnType<typeof draftFromOutbidInput>> = {}) {
@@ -524,6 +525,26 @@ test("stranger paying only the difference is raise_not_owner; original stays #1"
   assert.equal(ranked[0]?.bidUsd, 10);
   assert.equal(ranked[0]?.rank, 1);
   assert.equal(ranked[1]?.company, "Beta");
+});
+
+test("different apply URLs on the same host are distinct listings", async () => {
+  const store = new BoardStore();
+  const polar = new FakePolarPort(store);
+  const acme = await pay(polar, {
+    identity: "https://jobs.example.com/acme",
+    amountUsd: 5,
+    payerId: "pay_acme",
+    company: "Acme",
+  });
+  const beta = await pay(polar, {
+    identity: "https://jobs.example.com/beta",
+    amountUsd: 20,
+    payerId: "pay_beta",
+    company: "Beta",
+  });
+  assert.notEqual(acme.listing.id, beta.listing.id);
+  assert.notEqual(acme.listing.companyHandle, beta.listing.companyHandle);
+  assert.equal(store.listPaid("backend", PERIOD).length, 2);
 });
 
 test("same company handle in the same lane + period is a raise", async () => {
