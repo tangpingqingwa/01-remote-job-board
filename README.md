@@ -1,3 +1,3 @@
-# 01-remote-job-board
+# Remote Job Board
 
-Pay-to-rank board. Product contract lands in SPEC.md / BUILD.md.
+Weekly public auction for the #1 remote job in a function lane — rank is the bid.
