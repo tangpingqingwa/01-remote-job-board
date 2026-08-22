@@ -206,9 +206,30 @@ if [[ -f package.json ]]; then
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \
     || fail "period tests must assert the 302 hop"
-  if [[ -f scripts/live-smoke.sh ]]; then
-    fail "PR 7 must not start live-smoke"
+
+  echo "== live-smoke stays operator-only =="
+  [[ -f scripts/live-smoke.sh ]] || fail "missing scripts/live-smoke.sh"
+  [[ -x scripts/live-smoke.sh ]] || fail "scripts/live-smoke.sh must be executable"
+  [[ -f docs/live-smoke.md ]] || fail "missing docs/live-smoke.md"
+  [[ -s docs/live-smoke.md ]] || fail "empty docs/live-smoke.md"
+  if grep -Eq '^\s*(bash )?(\./)?scripts/live-smoke\.sh' scripts/test.sh; then
+    fail "test.sh must not invoke live-smoke.sh"
   fi
+  if grep -E '^[[:space:]]*(export[[:space:]]+)?POLAR_LIVE=1' scripts/test.sh >/dev/null; then
+    fail "test.sh must not set POLAR_LIVE=1"
+  fi
+  grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' scripts/live-smoke.sh \
+    || fail "live-smoke.sh must name BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
+  grep -q 'POLAR_LIVE' scripts/live-smoke.sh \
+    || fail "live-smoke.sh must gate live Polar on POLAR_LIVE"
+  grep -q 'live-smoke refuses CI=true' scripts/live-smoke.sh \
+    || fail "live-smoke.sh must refuse CI=true"
+  grep -q 'PASS-ERROR' docs/live-smoke.md || fail "docs/live-smoke.md missing PASS-ERROR"
+  grep -q 'BLOCKED-SECRET' docs/live-smoke.md || fail "docs/live-smoke.md missing BLOCKED-SECRET"
+  for n in 1 2 3 4 5 6 7 8 9 10 11 12 13; do
+    grep -q "| ${n} |" docs/live-smoke.md \
+      || fail "docs/live-smoke.md missing SPEC §10 row $n"
+  done
 
   echo "== install =="
   if [[ ! -d node_modules ]]; then
