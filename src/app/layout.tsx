@@ -20,9 +20,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <nav className="site-nav" aria-label="Main">
               <ul>
                 <li>
-                  <a href="/" aria-current="page">
-                    Leaderboard
-                  </a>
+                  <a href="/">Leaderboard</a>
                 </li>
                 <li>
                   <a href="/about">About</a>
