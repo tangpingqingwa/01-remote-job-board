@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { currentPeriodMeta, getBoardListings } from "../src/lib/board";
+import { getBoardListings } from "../src/lib/board";
+import { currentPeriodMeta } from "../src/lib/period";
 import { draftFromOutbidInput, planCheckout } from "../src/lib/listing";
 import { BoardStore, defaultBoardStore } from "../src/lib/store";
 import { rankListings } from "../src/lib/rank";

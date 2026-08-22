@@ -301,6 +301,12 @@ a:hover {
   color: var(--fg);
 }
 
+.apply {
+  margin-left: 0.85rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
 .salary {
   margin: 0.25rem 0 0;
   color: var(--muted);

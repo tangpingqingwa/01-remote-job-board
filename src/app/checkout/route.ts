@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { currentPeriodMeta, parseLane } from "../../lib/board";
+import { parseLane } from "../../lib/board";
+import { currentPeriodMeta } from "../../lib/period";
 import {
   draftFromOutbidInput,
   newPayerId,

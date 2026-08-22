@@ -1,3 +1,4 @@
+import { applyClickPath } from "../../lib/clicks";
 import type { RankedListing } from "../../lib/types";
 
 export function formatUsd(amount: number): string {
@@ -37,6 +38,13 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           <span className="clicks" data-clicks="">
             {formatClicks(listing.clicks)}
           </span>
+          <a
+            className="apply"
+            href={applyClickPath(listing.id)}
+            data-apply-url={listing.applyUrl}
+          >
+            Apply
+          </a>
         </p>
       </div>
     </article>
