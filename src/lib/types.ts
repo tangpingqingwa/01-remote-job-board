@@ -27,6 +27,8 @@ export type Listing = {
   clicks: number;
   createdAt: string;
   updatedAt: string;
+  /** Checkout owner. Required to raise by paying only the difference. */
+  payerId?: string;
 };
 
 export type RankedListing = Listing & {
