@@ -27,6 +27,7 @@ export type Listing = {
   clicks: number;
   createdAt: string;
   updatedAt: string;
+  payerId?: string;
 };
 
 export type RankedListing = Listing & {

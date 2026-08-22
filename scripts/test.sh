@@ -76,7 +76,7 @@ if [[ -f package.json ]]; then
 
   echo "== polar checkout files =="
   for f in src/payments/port.ts src/payments/fixture.ts src/payments/polar.ts \
-    src/app/return/page.tsx tests/checkout.test.ts; do
+    src/app/return/page.tsx src/lib/listing.ts tests/checkout.test.ts; do
     [[ -f "$f" ]] || fail "missing $f"
     [[ -s "$f" ]] || fail "empty $f"
   done
@@ -105,6 +105,22 @@ if [[ -f package.json ]]; then
     || fail "page.tsx must rank listings through rankListings"
   grep -q 'getBoardListings' src/app/page.tsx \
     || fail "page.tsx must load the board through getBoardListings"
+  grep -q 'export function planCheckout' src/lib/listing.ts \
+    || fail "listing.ts must export planCheckout"
+  grep -q 'export function applyPaidCheckout' src/lib/listing.ts \
+    || fail "listing.ts must apply paid create/raise"
+  for code in raise_too_small raise_not_owner identity_taken; do
+    grep -q "$code" src/lib/listing.ts \
+      || fail "listing.ts must emit $code"
+    grep -q "$code" tests/checkout.test.ts \
+      || fail "checkout tests must cover $code"
+  done
+  grep -q 'chargeUsd' src/lib/listing.ts \
+    || fail "listing.ts must charge the raise difference"
+  grep -q 'planCheckout' src/app/checkout/route.ts \
+    || fail "checkout route must plan raise vs create"
+  grep -q 'planCheckout' src/payments/fixture.ts \
+    || fail "fixture checkout must re-check raise rules"
   if grep -nE '\b(Acme|Google|Stripe)\b' src/lib/board.ts src/app/page.tsx >/dev/null; then
     fail "live board must not invent company listings"
   fi

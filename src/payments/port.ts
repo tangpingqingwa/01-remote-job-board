@@ -1,20 +1,12 @@
-import type { FunctionLane, Listing, SalaryBand } from "../lib/types";
+import type { Listing } from "../lib/types";
+import { CheckoutError, type ListingDraft } from "../lib/listing";
 import { MAX_BID_USD, MIN_BID_USD } from "../lib/types";
 import { defaultBoardStore, type BoardStore } from "../lib/store";
 import { isPolarLive } from "./env";
 import { getFakePolarPort } from "./fixture";
 import { LivePolarPort } from "./polar";
 
-export type ListingDraft = {
-  periodId: string;
-  lane: FunctionLane;
-  title: string;
-  company: string;
-  companyHandle: string;
-  applyUrl: string;
-  salary: SalaryBand | null;
-  bidUsd: number;
-};
+export { CheckoutError, type ListingDraft };
 
 export type CheckoutStart = {
   checkoutId: string;
@@ -44,16 +36,6 @@ export type PolarPort = {
   abandonCheckout(checkoutId: string): Promise<void>;
   getCheckout(checkoutId: string): CheckoutRecord | undefined;
 };
-
-export class CheckoutError extends Error {
-  constructor(
-    readonly code: string,
-    readonly httpStatus: number,
-  ) {
-    super(code);
-    this.name = "CheckoutError";
-  }
-}
 
 export function parseBidUsd(raw: unknown): number {
   if (typeof raw === "boolean") {

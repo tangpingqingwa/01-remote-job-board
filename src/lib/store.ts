@@ -18,8 +18,30 @@ export class BoardStore {
     return this.listings.find((row) => row.id === id);
   }
 
+  findByIdentity(
+    periodId: string,
+    lane: FunctionLane,
+    identity: { applyUrl: string; companyHandle: string },
+  ): Listing | undefined {
+    return this.listings.find(
+      (row) =>
+        row.periodId === periodId &&
+        row.lane === lane &&
+        (row.applyUrl === identity.applyUrl ||
+          row.companyHandle === identity.companyHandle),
+    );
+  }
+
   insertPaid(listing: Listing): void {
     this.listings.push(listing);
+  }
+
+  updatePaid(listing: Listing): void {
+    const index = this.listings.findIndex((row) => row.id === listing.id);
+    if (index === -1) {
+      throw new Error(`listing not found: ${listing.id}`);
+    }
+    this.listings[index] = listing;
   }
 }
 

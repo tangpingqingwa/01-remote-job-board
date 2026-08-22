@@ -1,4 +1,5 @@
 import type { Listing } from "../lib/types";
+import { applyPaidCheckout, planCheckout } from "../lib/listing";
 import { defaultBoardStore, type BoardStore } from "../lib/store";
 import {
   CheckoutError,
@@ -41,6 +42,7 @@ export class FakePolarPort implements PolarPort {
     if (!Number.isInteger(input.amountUsd) || input.amountUsd < 1) {
       throw new CheckoutError("invalid_bid", 400);
     }
+    planCheckout(this.store, input.listingDraft, input.amountUsd);
     const checkoutId = nextId("chk");
     this.checkouts.set(checkoutId, {
       checkoutId,
@@ -65,23 +67,13 @@ export class FakePolarPort implements PolarPort {
     if (checkout.status !== "open") return null;
 
     const now = new Date().toISOString();
-    const draft = checkout.listingDraft;
-    const listing: Listing = {
-      id: nextId("lst"),
-      periodId: draft.periodId,
-      lane: draft.lane,
-      title: draft.title,
-      company: draft.company,
-      companyHandle: draft.companyHandle,
-      applyUrl: draft.applyUrl,
-      salary: draft.salary,
-      bidUsd: draft.bidUsd,
-      paidUsd: checkout.amountUsd,
-      clicks: 0,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.store.insertPaid(listing);
+    const listing = applyPaidCheckout(
+      this.store,
+      checkout.listingDraft,
+      checkout.amountUsd,
+      now,
+      () => nextId("lst"),
+    );
     checkout.status = "paid";
     checkout.listingId = listing.id;
     return listing;
