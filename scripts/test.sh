@@ -62,6 +62,33 @@ if [[ -f package.json ]]; then
     [[ -s "$f" ]] || fail "empty $f"
   done
 
+  echo "== board UI files =="
+  for f in src/lib/rank.ts src/lib/board.ts \
+    src/components/board/board.tsx \
+    src/components/board/lane-tabs.tsx \
+    src/components/board/bid-form.tsx \
+    src/components/board/listing-card.tsx \
+    src/components/board/leaderboard.tsx \
+    tests/rank.test.ts; do
+    [[ -f "$f" ]] || fail "missing $f"
+    [[ -s "$f" ]] || fail "empty $f"
+  done
+  grep -q 'export function rankListings' src/lib/rank.ts \
+    || fail "rank.ts must export rankListings"
+  grep -q 'Outbid' src/components/board/bid-form.tsx \
+    || fail "bid form must render Outbid"
+  grep -q 'data-empty-lane' src/components/board/leaderboard.tsx \
+    || fail "leaderboard must have an honest empty-lane state"
+  grep -q 'getBoardListings' src/lib/board.ts \
+    || fail "board.ts must expose getBoardListings"
+  grep -q 'rankListings' src/app/page.tsx \
+    || fail "page.tsx must rank listings through rankListings"
+  grep -q 'getBoardListings' src/app/page.tsx \
+    || fail "page.tsx must load the board through getBoardListings"
+  if grep -nE '\b(Acme|Google|Stripe)\b' src/lib/board.ts src/app/page.tsx >/dev/null; then
+    fail "live board must not invent company listings"
+  fi
+
   echo "== install =="
   if [[ ! -d node_modules ]]; then
     if [[ -f package-lock.json ]]; then
@@ -83,7 +110,7 @@ if [[ -f package.json ]]; then
   echo "== unit tests =="
   if [[ -d tests ]] && find tests -name '*.test.ts' | grep -q .; then
     # Quoted so bash 3.2 does not eat **; Node 22's test runner expands the glob.
-    npx tsx --test 'tests/**/*.test.ts'
+    npx tsx --tsconfig tsconfig.test.json --test 'tests/**/*.test.ts'
   else
     echo "skip: no tests/**/*.test.ts yet"
   fi
