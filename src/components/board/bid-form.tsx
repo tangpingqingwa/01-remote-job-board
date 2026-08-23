@@ -46,6 +46,26 @@ export function BidForm({
             List a role
           </p>
         ) : null}
+        {laneEmpty ? (
+          <div
+            className="bid-row"
+            data-empty-identity=""
+            data-empty-identity-first=""
+          >
+            <label className="identity-label" htmlFor="identity">
+              Apply URL or company handle
+            </label>
+            <input
+              id="identity"
+              name="identity"
+              placeholder="Apply URL or company handle"
+              autoComplete="off"
+              spellCheck={false}
+              required
+              autoFocus
+            />
+          </div>
+        ) : null}
         <h2>
           <span>Claim #1 for</span>
           <span className="amount-stepper">
@@ -95,24 +115,17 @@ export function BidForm({
             </>
           )}
         </p>
-        <div
-          className="bid-row"
-          {...(laneEmpty ? { "data-empty-identity": "" } : {})}
-        >
-          {laneEmpty ? (
-            <label className="identity-label" htmlFor="identity">
-              Apply URL or company handle
-            </label>
-          ) : null}
-          <input
-            id="identity"
-            name="identity"
-            placeholder="Apply URL or company handle"
-            autoComplete="off"
-            spellCheck={false}
-            required
-            autoFocus={laneEmpty}
-          />
+        <div className="bid-row">
+          {laneEmpty ? null : (
+            <input
+              id="identity"
+              name="identity"
+              placeholder="Apply URL or company handle"
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+          )}
           <button type="submit" className="outbid">
             Outbid
           </button>
