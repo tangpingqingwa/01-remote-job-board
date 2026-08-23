@@ -378,6 +378,12 @@ a:hover {
   margin-bottom: 0;
 }
 
+.empty-lane a[data-live-week] {
+  color: var(--primary);
+  font-weight: 600;
+  border-bottom: 1px solid var(--primary);
+}
+
 .card,
 .job-sheet {
   position: relative;

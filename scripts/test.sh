@@ -103,6 +103,12 @@ if [[ -f package.json ]]; then
     || fail "empty lane must teach pay \$5 to list"
   grep -q 'hideEmptyChrome' src/components/board/leaderboard.tsx \
     || fail "live empty bay must yield claim chrome"
+  grep -q 'data-empty-closed' src/components/board/leaderboard.tsx \
+    || fail "closed empty week must be a distinct empty state"
+  grep -q 'Bids are closed' src/components/board/leaderboard.tsx \
+    || fail "closed empty week must say bids are closed"
+  grep -q 'data-live-week' src/components/board/leaderboard.tsx \
+    || fail "closed empty week must point at this week's live wall"
   grep -q 'MIN_BID_USD} takes' src/components/board/bid-form.tsx \
     || fail "empty claim box must say \$5 takes #1"
   grep -q 'Claim #1 for' src/components/board/bid-form.tsx \

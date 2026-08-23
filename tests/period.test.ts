@@ -259,6 +259,43 @@ test("closed-week board is read-only history of that period", () => {
   assert.match(html, /data-period-live="false"/);
   assert.match(html, /Closed week/);
   assert.match(html, /period=2026-W33/);
+  assert.match(html, /data-empty-closed="true"/);
+  assert.match(html, /Bids are closed/);
+  assert.match(html, /This lane was empty/);
+  assert.match(html, /data-live-week=""/);
+  assert.match(html, /href="\/\?lane=backend"/);
+  assert.match(html, /Open this week/);
+  assert.doesNotMatch(html, /Pay \$5 to list/);
+  assert.doesNotMatch(html, /Empty bay/);
+  assert.doesNotMatch(html, /data-bid-form/);
+  assert.doesNotMatch(html, />Outbid</);
+});
+
+test("closed-week occupied board stays history and still has no checkout", () => {
+  const listings = rankListings([
+    fixtureListing({
+      id: "lst_old",
+      company: "Acme",
+      bidUsd: 21,
+      periodId: WEEK_33,
+      createdAt: "2026-08-12T10:00:00.000Z",
+    }),
+  ]);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: WEEK_33,
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+      live: false,
+    }),
+  );
+  assert.match(html, /data-period-live="false"/);
+  assert.match(html, /Closed week/);
+  assert.match(html, /data-listing-card/);
+  assert.match(html, /\$21/);
+  assert.doesNotMatch(html, /data-empty-lane/);
+  assert.doesNotMatch(html, /Pay \$5 to list/);
   assert.doesNotMatch(html, /data-bid-form/);
   assert.doesNotMatch(html, />Outbid</);
 });
