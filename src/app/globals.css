@@ -323,11 +323,22 @@ a:hover {
   font: inherit;
 }
 
-.claim[data-empty-bay-list] .bid-row {
-  margin-top: 0.85rem;
+.claim[data-empty-bay-list] .bid-row[data-empty-identity-first] {
+  margin-top: 0;
+  margin-bottom: 0.95rem;
+}
+
+.claim[data-empty-bay-list] .identity-label {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  line-height: 1.2;
 }
 
 .claim[data-empty-bay-list] .bid-row input[name="identity"] {
+  flex: 1 1 100%;
+  height: 3rem;
+  min-height: 3rem;
   border: 2px solid var(--fg);
   background: #fff;
   font-weight: 600;

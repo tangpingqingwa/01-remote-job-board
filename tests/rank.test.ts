@@ -139,18 +139,24 @@ test("live empty bay stamps identity as the certain write", () => {
   );
   const claim = html.indexOf('id="claim"');
   const stamp = html.indexOf("data-empty-bay-list");
-  const label = html.indexOf("identity-label");
   const identityMark = html.indexOf("data-empty-identity");
+  const identityFirst = html.indexOf("data-empty-identity-first");
+  const label = html.indexOf("identity-label");
   const identity = html.indexOf('name="identity"');
+  const claimTitle = html.indexOf("Claim #1 for");
+  const amount = html.indexOf('name="amount"');
   const outbid = html.indexOf(">Outbid<");
   const about = html.indexOf("Function lanes");
   assert.ok(claim >= 0 && stamp > claim);
-  assert.ok(identityMark > stamp && label > identityMark);
-  assert.ok(identity > label && outbid > identity);
+  assert.ok(identityMark > stamp && identityFirst >= identityMark);
+  assert.ok(label > identityMark && identity > label);
+  assert.ok(claimTitle > identity && amount > claimTitle && outbid > amount);
   assert.ok(about >= 0 && stamp > about);
   assert.match(html, /data-empty-bay-list=""/);
   assert.match(html, /data-empty-identity=""/);
+  assert.match(html, /data-empty-identity-first=""/);
   assert.match(html, /htmlFor="identity"|for="identity"/);
+  assert.match(html, /autofocus/i);
   assert.match(html, /Apply URL or company handle/);
   assert.match(html, /Claim #1 for/);
   assert.match(html, /\$5 takes #1/);
@@ -182,8 +188,12 @@ test("occupied live wall keeps Outbid and does not hide raise rules", () => {
   assert.doesNotMatch(html, /data-empty-lane/);
   assert.doesNotMatch(html, /data-empty-bay-list/);
   assert.doesNotMatch(html, /data-empty-identity/);
+  assert.doesNotMatch(html, /data-empty-identity-first/);
   assert.doesNotMatch(html, /identity-label/);
   assert.doesNotMatch(html, /\$5 takes #1/);
+  const occupiedIdentity = html.indexOf('name="identity"');
+  const occupiedClaim = html.indexOf("Claim #1 for");
+  assert.ok(occupiedClaim >= 0 && occupiedIdentity > occupiedClaim);
 });
 
 test("cards render rank, title, company, $bid, and click count", () => {
