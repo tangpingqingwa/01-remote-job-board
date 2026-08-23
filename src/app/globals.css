@@ -501,6 +501,25 @@ a:hover {
   color: var(--primary);
 }
 
+.job-sheet[data-take-apply] .sheet-apply {
+  margin-top: 0.85rem;
+}
+
+.apply[data-apply-live] {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  border: 2px solid var(--fg);
+  background: var(--fg);
+  color: var(--sheet);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.apply[data-apply-live]:hover {
+  color: var(--sheet);
+  filter: brightness(1.08);
+}
+
 .salary {
   margin: 0.35rem 0 0;
   color: var(--fg);

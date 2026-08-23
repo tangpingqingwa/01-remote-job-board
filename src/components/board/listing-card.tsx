@@ -9,13 +9,21 @@ export function formatClicks(clicks: number): string {
   return `${clicks} ${clicks === 1 ? "click" : "clicks"}`;
 }
 
-export function ListingCard({ listing }: { listing: RankedListing }) {
+type ListingCardProps = {
+  listing: RankedListing;
+  live?: boolean;
+};
+
+export function ListingCard({ listing, live = true }: ListingCardProps) {
+  const takeApply = live && listing.rank === 1;
+
   return (
     <article
       className="card job-sheet"
       data-listing-card=""
       data-rank={listing.rank}
       data-listing-id={listing.id}
+      {...(takeApply ? { "data-take-apply": "" } : {})}
     >
       <span className="sheet-pin" aria-hidden="true" />
       <p className="sheet-rankline">
@@ -37,6 +45,7 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
             className="apply"
             href={applyClickPath(listing.id)}
             data-apply-url={listing.applyUrl}
+            {...(takeApply ? { "data-apply-live": "" } : {})}
           >
             Apply
           </a>

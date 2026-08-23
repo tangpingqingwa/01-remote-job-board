@@ -157,6 +157,8 @@ test("cards render rank, title, company, $bid, and click count", () => {
   assert.match(html, /9 clicks/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.match(html, />Apply</);
+  assert.match(html, /data-take-apply=""/);
+  assert.match(html, /data-apply-live=""/);
   assert.match(html, /Remote \(global\)/);
   assert.doesNotMatch(html, /\$0|competitive/i);
 });
@@ -248,6 +250,8 @@ test("hiring wall treats function lanes as the product and stays a job board", (
   assert.match(card, /data-salary=""/);
   assert.match(card, /\$140,000–\$180,000/);
   assert.match(card, />Apply</);
+  assert.match(card, /data-take-apply=""/);
+  assert.match(card, /href="\/out\/lst_paid"/);
   assert.doesNotMatch(card, /View site|Visit|Buy now|Shop/i);
 
   const silent = renderToStaticMarkup(
@@ -257,6 +261,50 @@ test("hiring wall treats function lanes as the product and stays a job board", (
   );
   assert.doesNotMatch(silent, /data-salary/);
   assert.doesNotMatch(silent, /\$140,000|\$0|competitive/i);
+});
+
+test("occupied live sheet stamps Apply as the certain outbound hop", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const take = html.indexOf("data-take-apply");
+  const applyLive = html.indexOf("data-apply-live");
+  const applyHref = html.indexOf('href="/out/lst_acme"');
+  const later = html.indexOf('data-listing-id="lst_gamma"');
+  const claim = html.indexOf('id="claim"');
+  const outbid = html.indexOf(">Outbid<");
+  assert.ok(take >= 0 && applyLive > take);
+  assert.ok(applyHref >= 0 && applyLive < later);
+  assert.ok(claim >= 0 && outbid > claim);
+  assert.match(html, /data-period-live="true"/);
+  assert.match(html, /href="\/out\/lst_acme"/);
+  assert.match(html, /class="apply"/);
+  assert.match(html, />Apply</);
+  assert.match(html, /\$21/);
+  assert.match(html, /Claim #1 for/);
+  assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
+  assert.doesNotMatch(html.slice(later), /data-take-apply|data-apply-live/);
+});
+
+test("later live ranks keep a quiet Apply hop, not a second take stamp", () => {
+  const later = rankListings(specTieRows)[1];
+  assert.ok(later);
+  const html = renderToStaticMarkup(
+    createElement(ListingCard, { listing: later }),
+  );
+  assert.match(html, /data-rank="2"/);
+  assert.match(html, />Apply</);
+  assert.match(html, /href="\/out\/lst_gamma"/);
+  assert.match(html, /class="apply"/);
+  assert.doesNotMatch(html, /data-take-apply/);
+  assert.doesNotMatch(html, /data-apply-live/);
 });
 
 test("ranked fixture cards keep SPEC §3 order in markup", () => {

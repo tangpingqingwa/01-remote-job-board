@@ -75,7 +75,7 @@ export function Leaderboard({
     <ol className="leaderboard" data-leaderboard="">
       {listings.map((listing) => (
         <li key={listing.id}>
-          <ListingCard listing={listing} />
+          <ListingCard listing={listing} live={!closed} />
         </li>
       ))}
     </ol>
