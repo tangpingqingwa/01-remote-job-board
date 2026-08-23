@@ -130,6 +130,7 @@ test("live empty bay yields the claim box as the only action", () => {
   assert.doesNotMatch(html, /data-list-after-apply-first/);
   assert.doesNotMatch(html, /after Apply/);
   assert.doesNotMatch(html, /data-first-click="apply"/);
+  assert.doesNotMatch(html, /data-apply-after-list-first/);
 });
 
 test("live empty bay stamps identity as the certain write", () => {
@@ -174,6 +175,7 @@ test("live empty bay stamps identity as the certain write", () => {
   assert.doesNotMatch(html, /data-list-after-apply-first/);
   assert.doesNotMatch(html, /after Apply/);
   assert.doesNotMatch(html, /data-first-click="apply"/);
+  assert.doesNotMatch(html, /data-apply-after-list-first/);
   assert.doesNotMatch(html, /star rating|chat|discord/i);
 });
 
@@ -225,6 +227,7 @@ test("cards render rank, title, company, $bid, and click count", () => {
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /data-apply-after-identity=""/);
   assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-list-after-apply=""/);
   assert.match(html, /data-list-after-apply-first=""/);
   assert.match(html, /href="#claim"/);
@@ -242,11 +245,13 @@ test("job sheet scans as a job: title, company, Apply, then $bid", () => {
   const company = html.indexOf("data-company");
   const apply = html.indexOf(">Apply<");
   const firstClick = html.indexOf('data-first-click="apply"');
+  const afterListFirst = html.indexOf("data-apply-after-list-first");
   const listAfter = html.indexOf("data-list-after-apply");
   const listFirst = html.indexOf("data-list-after-apply-first");
   const bid = html.indexOf("data-bid");
   assert.ok(title >= 0 && company > title && apply > company && bid > apply);
   assert.ok(firstClick > company && firstClick < apply);
+  assert.ok(afterListFirst > firstClick && afterListFirst < apply);
   assert.ok(listAfter > apply && listFirst >= listAfter && bid > listFirst);
   assert.match(html, /class="sheet-apply"/);
   assert.doesNotMatch(html, /sheet-head/);
@@ -371,6 +376,7 @@ test("occupied live claim stamps List a role so an employer can find the write",
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /data-apply-after-identity=""/);
   assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.equal((html.match(/data-list-role="employer"/g) ?? []).length, 1);
   assert.equal((html.match(/List a role/g) ?? []).length, 3);
@@ -401,12 +407,17 @@ test("occupied live sheet stamps Apply as the certain outbound hop", () => {
   assert.match(html, /class="apply"/);
   assert.match(html, />Apply</);
   assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /\$21/);
   assert.match(html, /Claim #1 for/);
   assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
-  assert.doesNotMatch(html.slice(later), /data-take-apply|data-apply-live|data-first-click="apply"/);
+  assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
+  assert.doesNotMatch(
+    html.slice(later),
+    /data-take-apply|data-apply-live|data-first-click="apply"|data-apply-after-list-first/,
+  );
 });
 
 test("occupied #1 Apply stays the certain hop after empty-bay identity leads", () => {
@@ -425,6 +436,7 @@ test("occupied #1 Apply stays the certain hop after empty-bay identity leads", (
   const afterIdentity = html.indexOf("data-apply-after-identity");
   const applyLive = html.indexOf("data-apply-live");
   const firstClick = html.indexOf('data-first-click="apply"');
+  const afterListFirst = html.indexOf("data-apply-after-list-first");
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf("data-list-after-apply");
   const listFirst = html.indexOf("data-list-after-apply-first");
@@ -434,13 +446,14 @@ test("occupied #1 Apply stays the certain hop after empty-bay identity leads", (
   assert.ok(listRole >= 0 && occupiedIdentity > listRole);
   assert.ok(take > occupiedIdentity && afterIdentity > take);
   assert.ok(applyLive > afterIdentity && firstClick > applyLive);
-  assert.ok(apply > firstClick && bid > apply);
+  assert.ok(afterListFirst > firstClick && apply > afterListFirst && bid > apply);
   assert.ok(listAfter > apply && listFirst >= listAfter && bid > listFirst);
   assert.ok(later > bid && laterStamp > later);
   assert.match(html, /data-apply-after-identity=""/);
   assert.match(html, /data-take-apply=""/);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.match(html, />Apply</);
   assert.match(html, /data-list-role="employer"/);
@@ -448,10 +461,14 @@ test("occupied #1 Apply stays the certain hop after empty-bay identity leads", (
   assert.match(html, /data-later-apply=""/);
   assert.equal((html.match(/data-apply-after-identity=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(html, /data-empty-identity-first/);
   assert.doesNotMatch(html, /identity-label/);
-  assert.doesNotMatch(html.slice(later), /data-apply-after-identity|data-first-click="apply"/);
+  assert.doesNotMatch(
+    html.slice(later),
+    /data-apply-after-identity|data-first-click="apply"|data-apply-after-list-first/,
+  );
 });
 
 test("later live ranks stamp Apply as the certain hop, not a second #1 take", () => {
@@ -476,6 +493,7 @@ test("later live ranks stamp Apply as the certain hop, not a second #1 take", ()
   assert.doesNotMatch(html, /data-apply-live/);
   assert.doesNotMatch(html, /data-apply-after-identity/);
   assert.doesNotMatch(html, /data-first-click="apply"/);
+  assert.doesNotMatch(html, /data-apply-after-list-first/);
   assert.doesNotMatch(html, /data-list-after-apply/);
   assert.doesNotMatch(html, /data-list-after-apply-first/);
   assert.doesNotMatch(html, /after Apply/);
@@ -524,7 +542,7 @@ test("occupied live later ranks stamp Apply so an applicant can take the hop", (
   assert.doesNotMatch(html.slice(0, later), /data-later-apply|data-apply-later/);
   assert.doesNotMatch(
     html.slice(later),
-    /data-take-apply|data-apply-live|data-apply-after-identity|data-first-click="apply"|data-list-after-apply|data-list-after-apply-first/,
+    /data-take-apply|data-apply-live|data-apply-after-identity|data-first-click="apply"|data-apply-after-list-first|data-list-after-apply|data-list-after-apply-first/,
   );
 });
 
@@ -542,6 +560,7 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   const afterIdentity = html.indexOf("data-apply-after-identity");
   const applyLive = html.indexOf("data-apply-live");
   const firstClick = html.indexOf('data-first-click="apply"');
+  const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
   const listFirst = html.indexOf('data-list-after-apply-first=""');
@@ -552,7 +571,8 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   const claim = html.indexOf('id="claim"');
   const listRole = html.indexOf('data-list-role="employer"');
   assert.ok(take >= 0 && afterIdentity > take && applyLive > afterIdentity);
-  assert.ok(firstClick > applyLive && apply > firstClick && listAfter > apply);
+  assert.ok(firstClick > applyLive && afterListFirst > firstClick);
+  assert.ok(apply > afterListFirst && listAfter > apply);
   assert.ok(listFirst >= listAfter && hopHref > apply && hopHref < bid && listAfter < bid);
   assert.ok(afterCopy > listAfter && bid > afterCopy && later > bid);
   assert.ok(claim >= 0 && listRole > claim && take > listRole);
@@ -566,6 +586,7 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /data-apply-after-identity=""/);
   assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.match(html, /data-list-role="employer"/);
   assert.match(html, /data-later-apply=""/);
@@ -574,6 +595,7 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   assert.equal((html.match(/href="#claim"/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-identity=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
@@ -581,7 +603,7 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   assert.doesNotMatch(html, /data-empty-identity-first/);
   assert.doesNotMatch(
     html.slice(later),
-    /data-list-after-apply|data-list-after-apply-first|after Apply|data-first-click="apply"/,
+    /data-list-after-apply|data-list-after-apply-first|after Apply|data-first-click="apply"|data-apply-after-list-first/,
   );
 });
 
@@ -599,6 +621,7 @@ test("occupied live #1 Apply wins the first click after List a role", () => {
   const afterIdentity = html.indexOf("data-apply-after-identity");
   const applyLive = html.indexOf("data-apply-live");
   const firstClick = html.indexOf('data-first-click="apply"');
+  const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const applyHref = html.indexOf('href="/out/lst_acme"');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
@@ -620,13 +643,15 @@ test("occupied live #1 Apply wins the first click after List a role", () => {
   );
   assert.ok(take >= 0 && afterIdentity > take && applyLive > afterIdentity);
   assert.ok(firstClick > applyLive && firstClick < listAfter);
+  assert.ok(afterListFirst > firstClick && afterListFirst < listAfter);
   assert.ok(applyHref >= 0 && applyHref < firstClick);
-  assert.ok(apply > firstClick && listAfter > apply);
+  assert.ok(apply > afterListFirst && listAfter > apply);
   assert.ok(listFirst >= listAfter && hopHref > apply && hopHref < bid && listAfter < bid);
   assert.ok(afterCopy > listAfter && bid > afterCopy && later > bid);
   assert.ok(laterStamp > later);
   assert.ok(claim >= 0 && listRole > claim && take > listRole);
   assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /data-apply-after-identity=""/);
   assert.match(html, /data-list-after-apply=""/);
@@ -639,6 +664,7 @@ test("occupied live #1 Apply wins the first click after List a role", () => {
   assert.match(html, /data-list-role="employer"/);
   assert.match(html, /data-later-apply=""/);
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-list-after-apply=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-list-after-apply-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-identity=""/g) ?? []).length, 1);
@@ -648,11 +674,12 @@ test("occupied live #1 Apply wins the first click after List a role", () => {
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(
     html.slice(later),
-    /data-first-click="apply"|data-list-after-apply|data-list-after-apply-first|after Apply/,
+    /data-first-click="apply"|data-apply-after-list-first|data-list-after-apply|data-list-after-apply-first|after Apply/,
   );
   assert.match(empty, /data-empty-bay-list=""/);
   assert.match(empty, /data-empty-identity-first=""/);
   assert.doesNotMatch(empty, /data-first-click="apply"/);
+  assert.doesNotMatch(empty, /data-apply-after-list-first/);
   assert.doesNotMatch(empty, /data-list-after-apply/);
   assert.doesNotMatch(empty, /data-list-after-apply-first/);
   assert.doesNotMatch(empty, /after Apply/);
@@ -669,6 +696,7 @@ test("occupied List a role stays certain after Apply wins the first click", () =
     }),
   );
   const firstClick = html.indexOf('data-first-click="apply"');
+  const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
   const listFirst = html.indexOf('data-list-after-apply-first=""');
@@ -690,7 +718,8 @@ test("occupied List a role stays certain after Apply wins the first click", () =
   const laterCard = renderToStaticMarkup(
     createElement(ListingCard, { listing: listings[1]! }),
   );
-  assert.ok(firstClick >= 0 && apply > firstClick && listAfter > apply);
+  assert.ok(firstClick >= 0 && afterListFirst > firstClick && apply > afterListFirst);
+  assert.ok(listAfter > apply);
   assert.ok(hopHref > apply && hopHref < bid && listAfter < bid);
   assert.ok(listFirst >= listAfter && afterCopy > listFirst && bid > afterCopy && later > bid);
   assert.ok(laterStamp > later);
@@ -702,6 +731,7 @@ test("occupied List a role stays certain after Apply wins the first click", () =
   assert.match(html, /after Apply/);
   assert.match(html, /Paying less than #1 still lists/);
   assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.match(html, /data-list-role="employer"/);
@@ -710,19 +740,105 @@ test("occupied List a role stays certain after Apply wins the first click", () =
   assert.equal((html.match(/data-list-after-apply-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/href="#claim"/g) ?? []).length, 1);
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(
     html.slice(later),
-    /data-list-after-apply|data-list-after-apply-first|after Apply|data-first-click="apply"/,
+    /data-list-after-apply|data-list-after-apply-first|after Apply|data-first-click="apply"|data-apply-after-list-first/,
   );
   assert.doesNotMatch(laterCard, /data-list-after-apply-first/);
   assert.doesNotMatch(laterCard, /data-list-after-apply/);
   assert.doesNotMatch(laterCard, /data-first-click="apply"/);
+  assert.doesNotMatch(laterCard, /data-apply-after-list-first/);
   assert.match(empty, /data-empty-bay-list=""/);
   assert.match(empty, /data-empty-identity-first=""/);
   assert.doesNotMatch(empty, /data-list-after-apply-first/);
   assert.doesNotMatch(empty, /data-list-after-apply/);
   assert.doesNotMatch(empty, /data-first-click="apply"/);
+  assert.doesNotMatch(empty, /data-apply-after-list-first/);
+});
+
+test("occupied #1 Apply stays certain after List a role is concentrated", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const firstClick = html.indexOf('data-first-click="apply"');
+  const afterListFirst = html.indexOf('data-apply-after-list-first=""');
+  const applyHref = html.indexOf('href="/out/lst_acme"');
+  const apply = html.indexOf(">Apply<");
+  const listAfter = html.indexOf('data-list-after-apply=""');
+  const listFirst = html.indexOf('data-list-after-apply-first=""');
+  const hopHref = html.indexOf('href="#claim"');
+  const afterCopy = html.indexOf("after Apply");
+  const bid = html.indexOf('data-bid=""');
+  const later = html.indexOf('data-listing-id="lst_gamma"');
+  const laterStamp = html.indexOf("data-later-apply");
+  const laterHop = html.indexOf("data-apply-later");
+  const claim = html.indexOf('id="claim"');
+  const listRole = html.indexOf('data-list-role="employer"');
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: listings[1]! }),
+  );
+  assert.ok(firstClick >= 0 && afterListFirst > firstClick && apply > afterListFirst);
+  assert.ok(applyHref >= 0 && applyHref < firstClick);
+  assert.ok(listAfter > apply && listFirst >= listAfter);
+  assert.ok(hopHref > apply && hopHref < bid && listAfter < bid);
+  assert.ok(afterCopy > listFirst && bid > afterCopy && later > bid);
+  assert.ok(laterStamp > later && laterHop > laterStamp);
+  assert.ok(claim >= 0 && listRole > claim && firstClick > listRole);
+  assert.match(html, /data-apply-after-list-first=""/);
+  assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-live=""/);
+  assert.match(html, /data-apply-after-identity=""/);
+  assert.match(html, /class="apply"[^>]*href="\/out\/lst_acme"/);
+  assert.match(html, />Apply</);
+  assert.match(html, /data-list-after-apply=""/);
+  assert.match(html, /data-list-after-apply-first=""/);
+  assert.match(html, /class="list-after-apply"[^>]*href="#claim"/);
+  assert.match(html, />List a role</);
+  assert.match(html, /after Apply/);
+  assert.match(html, /data-list-role="employer"/);
+  assert.match(html, /data-later-apply=""/);
+  assert.match(html, /data-apply-later=""/);
+  assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
+  assert.equal((html.match(/data-list-after-apply=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-list-after-apply-first=""/g) ?? []).length, 1);
+  assert.equal((html.match(/href="#claim"/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-identity=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
+  assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
+  assert.doesNotMatch(
+    html.slice(later),
+    /data-apply-after-list-first|data-first-click="apply"|data-list-after-apply|data-list-after-apply-first|after Apply/,
+  );
+  assert.doesNotMatch(laterCard, /data-apply-after-list-first/);
+  assert.doesNotMatch(laterCard, /data-first-click="apply"/);
+  assert.doesNotMatch(laterCard, /data-list-after-apply-first/);
+  assert.doesNotMatch(laterCard, /data-list-after-apply/);
+  assert.match(laterCard, /data-apply-later=""/);
+  assert.match(empty, /data-empty-bay-list=""/);
+  assert.match(empty, /data-empty-identity-first=""/);
+  assert.doesNotMatch(empty, /data-apply-after-list-first/);
+  assert.doesNotMatch(empty, /data-first-click="apply"/);
+  assert.doesNotMatch(empty, /data-list-after-apply-first/);
+  assert.doesNotMatch(empty, /data-list-after-apply/);
+  assert.doesNotMatch(empty, /after Apply/);
 });
 
 test("ranked fixture cards keep SPEC §3 order in markup", () => {

@@ -51,7 +51,11 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
             href={applyClickPath(listing.id)}
             data-apply-url={listing.applyUrl}
             {...(takeApply
-              ? { "data-apply-live": "", "data-first-click": "apply" }
+              ? {
+                  "data-apply-live": "",
+                  "data-first-click": "apply",
+                  "data-apply-after-list-first": "",
+                }
               : {})}
             {...(laterApply ? { "data-apply-later": "" } : {})}
           >
