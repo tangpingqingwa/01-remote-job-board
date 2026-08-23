@@ -99,6 +99,36 @@ if [[ -f package.json ]]; then
     || fail "bid form must render Outbid"
   grep -q 'data-empty-lane' src/components/board/leaderboard.tsx \
     || fail "leaderboard must have an honest empty-lane state"
+  grep -q 'Pay \${MIN_BID_USD} to list' src/components/board/leaderboard.tsx \
+    || fail "empty lane must teach pay \$5 to list"
+  grep -q 'Claim #1 for' src/components/board/bid-form.tsx \
+    || fail "bid form must clone Claim #1 for"
+  grep -q 'amount-field' src/components/board/bid-form.tsx \
+    || fail "bid form must keep the dashed amount field"
+  grep -q 'Decrease bid by one dollar' src/components/board/bid-form.tsx \
+    || fail "bid form must expose a minus stepper"
+  grep -q 'Increase bid by one dollar' src/components/board/bid-form.tsx \
+    || fail "bid form must expose a plus stepper"
+  grep -q 'name="identity"' src/components/board/bid-form.tsx \
+    || fail "bid form must keep one identity field"
+  grep -q 'data-hiring-wall' src/components/board/board.tsx \
+    || fail "board must be a hiring wall, not a generic directory"
+  grep -q 'Function lanes' src/components/board/board.tsx \
+    || fail "function lanes must be first-class wall chrome"
+  grep -q 'Remote (global)' src/components/board/listing-card.tsx \
+    || fail "job card must state remote (global)"
+  grep -q 'Apply' src/components/board/listing-card.tsx \
+    || fail "job card must keep Apply as the outbound CTA"
+  grep -q 'className="apply"' src/components/board/listing-card.tsx \
+    || fail "job card must keep a single Apply control"
+  grep -q 'data-salary' src/components/board/listing-card.tsx \
+    || fail "job card must render optional salary as a fact"
+  grep -q 'hiring wall' tests/rank.test.ts \
+    || fail "rank tests must cover the hiring-wall layout"
+  if grep -nE 'top company|featured employer|star rating' \
+    src/components/board/*.tsx src/app/page.tsx >/dev/null; then
+    fail "hiring wall must not add social proof"
+  fi
   grep -q 'getBoardListings' src/lib/board.ts \
     || fail "board.ts must expose getBoardListings"
   grep -q 'rankListings' src/app/page.tsx \

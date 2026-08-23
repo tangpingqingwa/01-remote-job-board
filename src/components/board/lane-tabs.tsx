@@ -19,6 +19,7 @@ export function LaneTabs({
         return (
           <a
             key={item}
+            className="wall-plate"
             href={href}
             aria-current={current ? "page" : undefined}
             data-lane={item}

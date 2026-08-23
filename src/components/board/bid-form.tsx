@@ -28,24 +28,43 @@ export function BidForm({ lane, defaultAmount }: BidFormProps) {
         <input type="hidden" name="lane" value={lane} />
         <h2>
           <span>Claim #1 for</span>
-          <label className="amount-field">
-            <span className="sr-only">Amount in dollars</span>
-            $
-            <input
-              name="amount"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={amount}
-              onChange={(event) => {
-                const next = Number(event.target.value.replace(/[^\d]/g, ""));
-                setAmount(clampAmount(next || MIN_BID_USD));
-              }}
-            />
-          </label>
+          <span className="amount-stepper">
+            <button
+              type="button"
+              className="step"
+              aria-label="Decrease bid by one dollar"
+              onClick={() => setAmount((current) => clampAmount(current - 1))}
+            >
+              −
+            </button>
+            <label className="amount-field">
+              <span className="sr-only">Amount in dollars</span>
+              $
+              <input
+                name="amount"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={amount}
+                onChange={(event) => {
+                  const next = Number(event.target.value.replace(/[^\d]/g, ""));
+                  setAmount(clampAmount(next || MIN_BID_USD));
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="step"
+              aria-label="Increase bid by one dollar"
+              onClick={() => setAmount((current) => clampAmount(current + 1))}
+            >
+              +
+            </button>
+          </span>
         </h2>
         <p className="claim-note">
-          New spots start at ${MIN_BID_USD}. Paying less than #1 still lists at
-          the rank that bid can take.
+          One action: claim this lane&apos;s #1. New spots start at $
+          {MIN_BID_USD}. Paying less than #1 still lists at the rank that bid
+          can take.
         </p>
         <div className="bid-row">
           <input

@@ -99,6 +99,7 @@ test("empty lane markup is honest", () => {
   );
   assert.match(html, /data-empty-lane="true"/);
   assert.match(html, /No listings this period/);
+  assert.match(html, /Pay \$5 to list/);
   assert.doesNotMatch(html, /data-listing-card/);
   assert.doesNotMatch(html, /Acme|Beta|Gamma|competitive salary/i);
 });
@@ -116,6 +117,8 @@ test("cards render rank, title, company, $bid, and click count", () => {
   assert.match(html, /\$21/);
   assert.match(html, /9 clicks/);
   assert.match(html, /href="\/out\/lst_acme"/);
+  assert.match(html, />Apply</);
+  assert.match(html, /Remote \(global\)/);
   assert.doesNotMatch(html, /\$0|competitive/i);
 });
 
@@ -147,6 +150,59 @@ test("board chrome has lane tabs, identity field, amount, and Outbid", () => {
   assert.match(html, /action="\/checkout"/);
   assert.match(html, /data-empty-lane="true"/);
   assert.match(html, /2026-W34/);
+  assert.match(html, /Claim #1 for/);
+  assert.match(html, /name="identity"/);
+  assert.match(html, /aria-label="Decrease bid by one dollar"/);
+  assert.match(html, /aria-label="Increase bid by one dollar"/);
+});
+
+test("hiring wall treats function lanes as the product and stays a job board", () => {
+  const withSalary = rankListings([
+    fixtureListing({
+      id: "lst_paid",
+      company: "Acme",
+      title: "Staff Backend Engineer",
+      bidUsd: 21,
+      clicks: 9,
+      createdAt: "2026-08-17T10:00:00.000Z",
+      salary: { minUsd: 140_000, maxUsd: 180_000 },
+    }),
+  ])[0];
+  assert.ok(withSalary);
+
+  const wall = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  assert.match(wall, /data-hiring-wall/);
+  assert.match(wall, /Function lanes/);
+  assert.match(wall, /claim this lane/);
+  assert.match(wall, /Pay \$5 to list/);
+  assert.match(wall, /aria-label="Function lanes"/);
+  assert.doesNotMatch(wall, /top company|featured|star rating|social proof/i);
+
+  const card = renderToStaticMarkup(
+    createElement(ListingCard, { listing: withSalary }),
+  );
+  assert.match(card, /Staff Backend Engineer/);
+  assert.match(card, /Acme/);
+  assert.match(card, /Remote \(global\)/);
+  assert.match(card, /data-salary=""/);
+  assert.match(card, /\$140,000–\$180,000/);
+  assert.match(card, />Apply</);
+  assert.doesNotMatch(card, /View site|Visit|Buy now|Shop/i);
+
+  const silent = renderToStaticMarkup(
+    createElement(ListingCard, {
+      listing: { ...withSalary, salary: null },
+    }),
+  );
+  assert.doesNotMatch(silent, /data-salary/);
+  assert.doesNotMatch(silent, /\$140,000|\$0|competitive/i);
 });
 
 test("ranked fixture cards keep SPEC §3 order in markup", () => {
