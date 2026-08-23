@@ -104,6 +104,45 @@ test("empty lane markup is honest", () => {
   assert.doesNotMatch(html, /Acme|Beta|Gamma|competitive salary/i);
 });
 
+test("live empty bay yields the claim box as the only action", () => {
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  assert.match(html, /data-empty-lane="true"/);
+  assert.match(html, /data-empty-quiet="true"/);
+  assert.match(html, /data-lane-empty="true"/);
+  assert.match(html, /\$5 takes #1/);
+  assert.match(html, />Outbid</);
+  assert.match(html, /Nobody is invented here/);
+  assert.doesNotMatch(html, /Pay \$5 to list/);
+  assert.doesNotMatch(html, /Empty bay/);
+  assert.doesNotMatch(html, /Already on this lane/);
+  assert.doesNotMatch(html, /Paying less than #1/);
+});
+
+test("occupied live wall keeps Outbid and does not hide raise rules", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  assert.match(html, /data-lane-empty="false"/);
+  assert.match(html, />Outbid</);
+  assert.match(html, /Already on this lane/);
+  assert.match(html, /Paying less than #1/);
+  assert.doesNotMatch(html, /data-empty-lane/);
+  assert.doesNotMatch(html, /\$5 takes #1/);
+});
+
 test("cards render rank, title, company, $bid, and click count", () => {
   const [acme] = rankListings(specTieRows);
   assert.ok(acme);
@@ -180,8 +219,8 @@ test("hiring wall treats function lanes as the product and stays a job board", (
   );
   assert.match(wall, /data-hiring-wall/);
   assert.match(wall, /Function lanes/);
-  assert.match(wall, /claim this lane/);
-  assert.match(wall, /Pay \$5 to list/);
+  assert.match(wall, /\$5 takes #1/);
+  assert.match(wall, /Nobody is invented here/);
   assert.match(wall, /aria-label="Function lanes"/);
   assert.doesNotMatch(wall, /top company|featured|star rating|social proof/i);
 

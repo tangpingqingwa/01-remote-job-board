@@ -6,10 +6,31 @@ import { ListingCard } from "./listing-card";
 type LeaderboardProps = {
   lane: FunctionLane;
   listings: readonly RankedListing[];
+  hideEmptyChrome?: boolean;
 };
 
-export function Leaderboard({ lane, listings }: LeaderboardProps) {
+export function Leaderboard({
+  lane,
+  listings,
+  hideEmptyChrome = false,
+}: LeaderboardProps) {
   if (listings.length === 0) {
+    if (hideEmptyChrome) {
+      return (
+        <div
+          className="empty-lane empty-lane-quiet"
+          data-empty-lane="true"
+          data-empty-quiet="true"
+        >
+          <p className="sr-only">
+            No listings this period in {laneLabel(lane)}. Rank is the bid. This
+            lane is empty. Claim #1 above for ${MIN_BID_USD}. Nobody is invented
+            here.
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="empty-lane" data-empty-lane="true">
         <p className="empty-lane-kicker">Empty bay</p>

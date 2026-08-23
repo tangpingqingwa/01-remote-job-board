@@ -101,6 +101,10 @@ if [[ -f package.json ]]; then
     || fail "leaderboard must have an honest empty-lane state"
   grep -q 'Pay \${MIN_BID_USD} to list' src/components/board/leaderboard.tsx \
     || fail "empty lane must teach pay \$5 to list"
+  grep -q 'hideEmptyChrome' src/components/board/leaderboard.tsx \
+    || fail "live empty bay must yield claim chrome"
+  grep -q 'MIN_BID_USD} takes' src/components/board/bid-form.tsx \
+    || fail "empty claim box must say \$5 takes #1"
   grep -q 'Claim #1 for' src/components/board/bid-form.tsx \
     || fail "bid form must clone Claim #1 for"
   grep -q 'amount-field' src/components/board/bid-form.tsx \
