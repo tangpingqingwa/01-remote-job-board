@@ -12,19 +12,20 @@ export function formatClicks(clicks: number): string {
 export function ListingCard({ listing }: { listing: RankedListing }) {
   return (
     <article
-      className="card"
+      className="card job-sheet"
       data-listing-card=""
       data-rank={listing.rank}
       data-listing-id={listing.id}
     >
-      <span className="rank">#{listing.rank}</span>
+      <span className="sheet-pin" aria-hidden="true" />
+      <header className="sheet-head">
+        <span className="rank">#{listing.rank}</span>
+        <p className="bid" data-bid="">
+          {formatUsd(listing.bidUsd)}
+        </p>
+      </header>
       <div className="card-body">
-        <div className="card-top">
-          <h3 className="title">{listing.title}</h3>
-          <p className="bid" data-bid="">
-            {formatUsd(listing.bidUsd)}
-          </p>
-        </div>
+        <h3 className="title">{listing.title}</h3>
         <p className="company" data-company="">
           {listing.company}
         </p>

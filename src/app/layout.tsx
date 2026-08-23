@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Remote Job Board",
+  title: "Hiring wall · Remote Job Board",
   description:
     "Weekly public auction for the #1 remote job in a function lane. Rank is the bid.",
 };
@@ -15,6 +15,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <header className="site-header">
           <div className="site-header-inner">
             <a className="logo" href="/">
+              <span className="logo-kicker">Hiring wall</span>
               remote<span>.</span>jobs
             </a>
             <nav className="site-nav" aria-label="Main">
