@@ -284,6 +284,13 @@ test("closed-week occupied board stays history and still has no checkout", () =>
       periodId: WEEK_33,
       createdAt: "2026-08-12T10:00:00.000Z",
     }),
+    fixtureListing({
+      id: "lst_old_later",
+      company: "Gamma",
+      bidUsd: 8,
+      periodId: WEEK_33,
+      createdAt: "2026-08-13T10:00:00.000Z",
+    }),
   ]);
   const html = renderToStaticMarkup(
     createElement(Board, {
@@ -300,12 +307,16 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.match(html, /\$21/);
   assert.match(html, />Apply</);
   assert.match(html, /href="\/out\/lst_old"/);
+  assert.match(html, /href="\/out\/lst_old_later"/);
+  assert.match(html, /data-rank="2"/);
   assert.doesNotMatch(html, /data-empty-lane/);
   assert.doesNotMatch(html, /Pay \$5 to list/);
   assert.doesNotMatch(html, /data-bid-form/);
   assert.doesNotMatch(html, />Outbid</);
   assert.doesNotMatch(html, /data-take-apply/);
   assert.doesNotMatch(html, /data-apply-live/);
+  assert.doesNotMatch(html, /data-later-apply/);
+  assert.doesNotMatch(html, /data-apply-later/);
   assert.doesNotMatch(html, /data-list-role/);
   assert.doesNotMatch(html, /List a role/);
 });

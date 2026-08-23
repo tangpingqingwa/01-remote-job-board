@@ -145,6 +145,16 @@ if [[ -f package.json ]]; then
     || fail "closed-week sheets must not stamp a live Apply hop"
   grep -q 'data-take-apply' tests/period.test.ts \
     || fail "period tests must keep closed-week Apply unstamped"
+  grep -q 'data-later-apply' src/components/board/listing-card.tsx \
+    || fail "live later-rank sheet must stamp the Apply hop"
+  grep -q 'data-apply-later' src/components/board/listing-card.tsx \
+    || fail "live later-rank Apply must be the outbound hop"
+  grep -q 'data-apply-later' src/app/globals.css \
+    || fail "later-rank Apply hop must be visually certain"
+  grep -q 'data-later-apply' tests/rank.test.ts \
+    || fail "rank tests must cover taking Apply on a later live sheet"
+  grep -q 'data-later-apply' tests/period.test.ts \
+    || fail "period tests must keep closed-week later Apply unstamped"
   grep -q 'data-list-role' src/components/board/bid-form.tsx \
     || fail "occupied live claim must stamp List a role"
   grep -q 'List a role' src/components/board/bid-form.tsx \
