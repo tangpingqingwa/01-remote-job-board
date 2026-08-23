@@ -161,6 +161,14 @@ if [[ -f package.json ]]; then
     || fail "live #1 Apply must be the outbound hop"
   grep -q 'data-apply-live' src/app/globals.css \
     || fail "live Apply hop must be visually certain"
+  grep -q 'data-apply-after-identity' src/components/board/listing-card.tsx \
+    || fail "occupied #1 Apply must stamp the hop after identity"
+  grep -q 'data-apply-after-identity' src/app/globals.css \
+    || fail "occupied #1 Apply after identity must be visually certain"
+  grep -q 'data-apply-after-identity' tests/rank.test.ts \
+    || fail "rank tests must cover Apply after empty-bay identity leads"
+  grep -q 'data-apply-after-identity' tests/period.test.ts \
+    || fail "period tests must keep closed-week Apply after identity unstamped"
   grep -q 'data-take-apply' tests/rank.test.ts \
     || fail "rank tests must cover taking Apply on a live sheet"
   grep -q 'live={!closed}' src/components/board/leaderboard.tsx \

@@ -42,7 +42,10 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
             {formatUsd(listing.salary.minUsd)}–{formatUsd(listing.salary.maxUsd)}
           </p>
         ) : null}
-        <p className="sheet-apply">
+        <p
+          className="sheet-apply"
+          {...(takeApply ? { "data-apply-after-identity": "" } : {})}
+        >
           <a
             className="apply"
             href={applyClickPath(listing.id)}
