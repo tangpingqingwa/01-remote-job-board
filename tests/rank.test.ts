@@ -116,6 +116,7 @@ test("live empty bay yields the claim box as the only action", () => {
   assert.match(html, /data-empty-lane="true"/);
   assert.match(html, /data-empty-quiet="true"/);
   assert.match(html, /data-lane-empty="true"/);
+  assert.match(html, /data-empty-bay-list=""/);
   assert.match(html, /\$5 takes #1/);
   assert.match(html, />Outbid</);
   assert.match(html, /Nobody is invented here/);
@@ -125,6 +126,40 @@ test("live empty bay yields the claim box as the only action", () => {
   assert.doesNotMatch(html, /Paying less than #1/);
   assert.doesNotMatch(html, /data-list-role/);
   assert.doesNotMatch(html, /List a role/);
+});
+
+test("live empty bay stamps identity as the certain write", () => {
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const claim = html.indexOf('id="claim"');
+  const stamp = html.indexOf("data-empty-bay-list");
+  const label = html.indexOf("identity-label");
+  const identityMark = html.indexOf("data-empty-identity");
+  const identity = html.indexOf('name="identity"');
+  const outbid = html.indexOf(">Outbid<");
+  const about = html.indexOf("Function lanes");
+  assert.ok(claim >= 0 && stamp > claim);
+  assert.ok(identityMark > stamp && label > identityMark);
+  assert.ok(identity > label && outbid > identity);
+  assert.ok(about >= 0 && stamp > about);
+  assert.match(html, /data-empty-bay-list=""/);
+  assert.match(html, /data-empty-identity=""/);
+  assert.match(html, /htmlFor="identity"|for="identity"/);
+  assert.match(html, /Apply URL or company handle/);
+  assert.match(html, /Claim #1 for/);
+  assert.match(html, /\$5 takes #1/);
+  assert.match(html, /name="identity"/);
+  assert.match(html, />Outbid</);
+  assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /Pay \$5 to list/);
+  assert.doesNotMatch(html, /Empty bay/);
+  assert.doesNotMatch(html, /star rating|chat|discord/i);
 });
 
 test("occupied live wall keeps Outbid and does not hide raise rules", () => {
@@ -143,7 +178,11 @@ test("occupied live wall keeps Outbid and does not hide raise rules", () => {
   assert.match(html, />Outbid</);
   assert.match(html, /Already on this lane/);
   assert.match(html, /Paying less than #1/);
+  assert.match(html, /name="identity"/);
   assert.doesNotMatch(html, /data-empty-lane/);
+  assert.doesNotMatch(html, /data-empty-bay-list/);
+  assert.doesNotMatch(html, /data-empty-identity/);
+  assert.doesNotMatch(html, /identity-label/);
   assert.doesNotMatch(html, /\$5 takes #1/);
 });
 

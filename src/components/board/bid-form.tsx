@@ -30,6 +30,7 @@ export function BidForm({
       className="claim"
       id="claim"
       data-lane-empty={laneEmpty ? "true" : "false"}
+      {...(laneEmpty ? { "data-empty-bay-list": "" } : {})}
       {...(listRole ? { "data-list-role": "employer" } : {})}
       aria-label={listRole ? "List a role" : undefined}
     >
@@ -94,7 +95,15 @@ export function BidForm({
             </>
           )}
         </p>
-        <div className="bid-row">
+        <div
+          className="bid-row"
+          {...(laneEmpty ? { "data-empty-identity": "" } : {})}
+        >
+          {laneEmpty ? (
+            <label className="identity-label" htmlFor="identity">
+              Apply URL or company handle
+            </label>
+          ) : null}
           <input
             id="identity"
             name="identity"
@@ -102,6 +111,7 @@ export function BidForm({
             autoComplete="off"
             spellCheck={false}
             required
+            autoFocus={laneEmpty}
           />
           <button type="submit" className="outbid">
             Outbid

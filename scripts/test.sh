@@ -121,6 +121,20 @@ if [[ -f package.json ]]; then
     || fail "bid form must expose a plus stepper"
   grep -q 'name="identity"' src/components/board/bid-form.tsx \
     || fail "bid form must keep one identity field"
+  grep -q 'data-empty-bay-list' src/components/board/bid-form.tsx \
+    || fail "live empty claim must stamp the listing write"
+  grep -q 'data-empty-identity' src/components/board/bid-form.tsx \
+    || fail "live empty claim must stamp the identity field"
+  grep -q 'identity-label' src/components/board/bid-form.tsx \
+    || fail "live empty identity must have a visible label"
+  grep -q 'data-empty-bay-list' src/app/globals.css \
+    || fail "live empty identity stamp must be visually certain"
+  grep -q 'data-empty-bay-list' tests/rank.test.ts \
+    || fail "rank tests must cover listing on a live empty bay"
+  grep -q 'data-empty-identity' tests/rank.test.ts \
+    || fail "rank tests must stamp the empty-bay identity field"
+  grep -q 'data-empty-bay-list' tests/period.test.ts \
+    || fail "period tests must keep closed weeks unstamped for listing"
   grep -q 'data-hiring-wall' src/components/board/board.tsx \
     || fail "board must be a hiring wall, not a generic directory"
   grep -q 'Function lanes' src/components/board/board.tsx \
