@@ -123,6 +123,8 @@ test("live empty bay yields the claim box as the only action", () => {
   assert.doesNotMatch(html, /Empty bay/);
   assert.doesNotMatch(html, /Already on this lane/);
   assert.doesNotMatch(html, /Paying less than #1/);
+  assert.doesNotMatch(html, /data-list-role/);
+  assert.doesNotMatch(html, /List a role/);
 });
 
 test("occupied live wall keeps Outbid and does not hide raise rules", () => {
@@ -136,6 +138,8 @@ test("occupied live wall keeps Outbid and does not hide raise rules", () => {
     }),
   );
   assert.match(html, /data-lane-empty="false"/);
+  assert.match(html, /data-list-role="employer"/);
+  assert.match(html, /List a role/);
   assert.match(html, />Outbid</);
   assert.match(html, /Already on this lane/);
   assert.match(html, /Paying less than #1/);
@@ -261,6 +265,43 @@ test("hiring wall treats function lanes as the product and stays a job board", (
   );
   assert.doesNotMatch(silent, /data-salary/);
   assert.doesNotMatch(silent, /\$140,000|\$0|competitive/i);
+});
+
+test("occupied live claim stamps List a role so an employer can find the write", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const take = html.indexOf("data-take-apply");
+  const applyLive = html.indexOf("data-apply-live");
+  const claim = html.indexOf('id="claim"');
+  const listRole = html.indexOf('data-list-role="employer"');
+  const stamp = html.indexOf("List a role");
+  const claimTitle = html.indexOf("Claim #1 for");
+  const outbid = html.indexOf(">Outbid<");
+  const later = html.indexOf('data-listing-id="lst_gamma"');
+  assert.ok(claim >= 0 && listRole > claim && stamp > claim);
+  assert.ok(claimTitle > stamp && outbid > claimTitle);
+  assert.ok(take > outbid && applyLive > take);
+  assert.ok(later > applyLive);
+  assert.match(html, /data-list-role-stamp=""/);
+  assert.match(html, /aria-label="List a role"/);
+  assert.match(html, /List a remote role on this lane/);
+  assert.match(html, /Claim #1 for/);
+  assert.match(html, /name="identity"/);
+  assert.match(html, /class="amount-field"/);
+  assert.match(html, />Outbid</);
+  assert.match(html, /data-take-apply=""/);
+  assert.match(html, /data-apply-live=""/);
+  assert.match(html, /href="\/out\/lst_acme"/);
+  assert.equal((html.match(/data-list-role="employer"/g) ?? []).length, 1);
+  assert.equal((html.match(/List a role/g) ?? []).length, 2);
+  assert.doesNotMatch(html.slice(later), /data-list-role|List a role/);
 });
 
 test("occupied live sheet stamps Apply as the certain outbound hop", () => {
