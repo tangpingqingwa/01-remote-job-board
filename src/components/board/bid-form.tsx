@@ -23,12 +23,15 @@ export function BidForm({
   laneEmpty = false,
 }: BidFormProps) {
   const [amount, setAmount] = useState(() => clampAmount(defaultAmount));
+  const listRole = !laneEmpty;
 
   return (
     <section
       className="claim"
       id="claim"
       data-lane-empty={laneEmpty ? "true" : "false"}
+      {...(listRole ? { "data-list-role": "employer" } : {})}
+      aria-label={listRole ? "List a role" : undefined}
     >
       <form
         action="/checkout"
@@ -37,6 +40,11 @@ export function BidForm({
         data-lane={lane}
       >
         <input type="hidden" name="lane" value={lane} />
+        {listRole ? (
+          <p className="list-this-role" data-list-role-stamp="">
+            List a role
+          </p>
+        ) : null}
         <h2>
           <span>Claim #1 for</span>
           <span className="amount-stepper">
@@ -80,7 +88,7 @@ export function BidForm({
             </>
           ) : (
             <>
-              One action: claim this lane&apos;s #1. New spots start at $
+              List a remote role on this lane. New spots start at $
               {MIN_BID_USD}. Paying less than #1 still lists at the rank that
               bid can take.
             </>

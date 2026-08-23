@@ -145,6 +145,16 @@ if [[ -f package.json ]]; then
     || fail "closed-week sheets must not stamp a live Apply hop"
   grep -q 'data-take-apply' tests/period.test.ts \
     || fail "period tests must keep closed-week Apply unstamped"
+  grep -q 'data-list-role' src/components/board/bid-form.tsx \
+    || fail "occupied live claim must stamp List a role"
+  grep -q 'List a role' src/components/board/bid-form.tsx \
+    || fail "occupied live claim must say List a role"
+  grep -q 'list-this-role' src/app/globals.css \
+    || fail "occupied List a role stamp must be visually certain"
+  grep -q 'data-list-role' tests/rank.test.ts \
+    || fail "rank tests must cover listing a role on an occupied live wall"
+  grep -q 'data-list-role' tests/period.test.ts \
+    || fail "period tests must keep closed-week history unstamped for listing"
   grep -q 'data-salary' src/components/board/listing-card.tsx \
     || fail "job card must render optional salary as a fact"
   grep -q 'hiring wall' tests/rank.test.ts \

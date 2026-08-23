@@ -271,6 +271,8 @@ test("closed-week board is read-only history of that period", () => {
   assert.doesNotMatch(html, /Empty bay/);
   assert.doesNotMatch(html, /data-bid-form/);
   assert.doesNotMatch(html, />Outbid</);
+  assert.doesNotMatch(html, /data-list-role/);
+  assert.doesNotMatch(html, /List a role/);
 });
 
 test("closed-week occupied board stays history and still has no checkout", () => {
@@ -304,4 +306,6 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.doesNotMatch(html, />Outbid</);
   assert.doesNotMatch(html, /data-take-apply/);
   assert.doesNotMatch(html, /data-apply-live/);
+  assert.doesNotMatch(html, /data-list-role/);
+  assert.doesNotMatch(html, /List a role/);
 });
