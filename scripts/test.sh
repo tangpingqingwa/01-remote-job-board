@@ -133,6 +133,18 @@ if [[ -f package.json ]]; then
     || fail "job card must keep a single Apply control"
   grep -q 'sheet-apply' src/components/board/listing-card.tsx \
     || fail "job card must put Apply after the job identity"
+  grep -q 'data-take-apply' src/components/board/listing-card.tsx \
+    || fail "live #1 sheet must stamp the Apply hop"
+  grep -q 'data-apply-live' src/components/board/listing-card.tsx \
+    || fail "live #1 Apply must be the outbound hop"
+  grep -q 'data-apply-live' src/app/globals.css \
+    || fail "live Apply hop must be visually certain"
+  grep -q 'data-take-apply' tests/rank.test.ts \
+    || fail "rank tests must cover taking Apply on a live sheet"
+  grep -q 'live={!closed}' src/components/board/leaderboard.tsx \
+    || fail "closed-week sheets must not stamp a live Apply hop"
+  grep -q 'data-take-apply' tests/period.test.ts \
+    || fail "period tests must keep closed-week Apply unstamped"
   grep -q 'data-salary' src/components/board/listing-card.tsx \
     || fail "job card must render optional salary as a fact"
   grep -q 'hiring wall' tests/rank.test.ts \

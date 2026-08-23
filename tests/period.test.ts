@@ -242,6 +242,8 @@ test("click count is public on the card and Apply uses /out/:id", () => {
   assert.match(html, /data-clicks=""/);
   assert.match(html, /href="\/out\/lst_card"/);
   assert.match(html, /data-apply-url="https:\/\/jobs.example.com\/acme"/);
+  assert.match(html, /data-take-apply=""/);
+  assert.match(html, /data-apply-live=""/);
   assert.doesNotMatch(html, /utm_/);
 });
 
@@ -294,8 +296,12 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.match(html, /Closed week/);
   assert.match(html, /data-listing-card/);
   assert.match(html, /\$21/);
+  assert.match(html, />Apply</);
+  assert.match(html, /href="\/out\/lst_old"/);
   assert.doesNotMatch(html, /data-empty-lane/);
   assert.doesNotMatch(html, /Pay \$5 to list/);
   assert.doesNotMatch(html, /data-bid-form/);
   assert.doesNotMatch(html, />Outbid</);
+  assert.doesNotMatch(html, /data-take-apply/);
+  assert.doesNotMatch(html, /data-apply-live/);
 });
