@@ -559,6 +559,10 @@ a:hover {
   margin-top: 0.85rem;
 }
 
+.job-sheet[data-take-apply] .sheet-apply[data-apply-after-identity] {
+  margin-top: 1rem;
+}
+
 .apply[data-apply-live],
 .apply[data-apply-later] {
   display: inline-block;
@@ -571,6 +575,14 @@ a:hover {
 .apply[data-apply-live] {
   background: var(--fg);
   color: var(--sheet);
+}
+
+.job-sheet[data-take-apply] .sheet-apply[data-apply-after-identity] .apply[data-apply-live] {
+  min-height: 2.75rem;
+  padding: 0.55rem 1.15rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  box-shadow: 3px 3px 0 rgba(26, 33, 24, 0.18);
 }
 
 .apply[data-apply-live]:hover {

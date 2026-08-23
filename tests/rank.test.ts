@@ -165,6 +165,7 @@ test("live empty bay stamps identity as the certain write", () => {
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(html, /Pay \$5 to list/);
   assert.doesNotMatch(html, /Empty bay/);
+  assert.doesNotMatch(html, /data-apply-after-identity/);
   assert.doesNotMatch(html, /star rating|chat|discord/i);
 });
 
@@ -212,6 +213,7 @@ test("cards render rank, title, company, $bid, and click count", () => {
   assert.match(html, />Apply</);
   assert.match(html, /data-take-apply=""/);
   assert.match(html, /data-apply-live=""/);
+  assert.match(html, /data-apply-after-identity=""/);
   assert.match(html, /Remote \(global\)/);
   assert.doesNotMatch(html, /\$0|competitive/i);
 });
@@ -304,6 +306,7 @@ test("hiring wall treats function lanes as the product and stays a job board", (
   assert.match(card, /\$140,000–\$180,000/);
   assert.match(card, />Apply</);
   assert.match(card, /data-take-apply=""/);
+  assert.match(card, /data-apply-after-identity=""/);
   assert.match(card, /href="\/out\/lst_paid"/);
   assert.doesNotMatch(card, /View site|Visit|Buy now|Shop/i);
 
@@ -347,6 +350,7 @@ test("occupied live claim stamps List a role so an employer can find the write",
   assert.match(html, />Outbid</);
   assert.match(html, /data-take-apply=""/);
   assert.match(html, /data-apply-live=""/);
+  assert.match(html, /data-apply-after-identity=""/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.equal((html.match(/data-list-role="employer"/g) ?? []).length, 1);
   assert.equal((html.match(/List a role/g) ?? []).length, 2);
@@ -383,6 +387,44 @@ test("occupied live sheet stamps Apply as the certain outbound hop", () => {
   assert.doesNotMatch(html.slice(later), /data-take-apply|data-apply-live/);
 });
 
+test("occupied #1 Apply stays the certain hop after empty-bay identity leads", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const listRole = html.indexOf('data-list-role="employer"');
+  const occupiedIdentity = html.indexOf('name="identity"');
+  const take = html.indexOf("data-take-apply");
+  const afterIdentity = html.indexOf("data-apply-after-identity");
+  const applyLive = html.indexOf("data-apply-live");
+  const apply = html.indexOf(">Apply<");
+  const bid = html.indexOf('data-bid=""');
+  const later = html.indexOf('data-listing-id="lst_gamma"');
+  const laterStamp = html.indexOf("data-later-apply");
+  assert.ok(listRole >= 0 && occupiedIdentity > listRole);
+  assert.ok(take > occupiedIdentity && afterIdentity > take);
+  assert.ok(applyLive > afterIdentity && apply > applyLive && bid > apply);
+  assert.ok(later > bid && laterStamp > later);
+  assert.match(html, /data-apply-after-identity=""/);
+  assert.match(html, /data-take-apply=""/);
+  assert.match(html, /data-apply-live=""/);
+  assert.match(html, /href="\/out\/lst_acme"/);
+  assert.match(html, />Apply</);
+  assert.match(html, /data-list-role="employer"/);
+  assert.match(html, /List a role/);
+  assert.match(html, /data-later-apply=""/);
+  assert.equal((html.match(/data-apply-after-identity=""/g) ?? []).length, 1);
+  assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /data-empty-identity-first/);
+  assert.doesNotMatch(html, /identity-label/);
+  assert.doesNotMatch(html.slice(later), /data-apply-after-identity/);
+});
+
 test("later live ranks stamp Apply as the certain hop, not a second #1 take", () => {
   const later = rankListings(specTieRows)[1];
   assert.ok(later);
@@ -403,6 +445,7 @@ test("later live ranks stamp Apply as the certain hop, not a second #1 take", ()
   assert.match(html, /class="sheet-apply"/);
   assert.doesNotMatch(html, /data-take-apply/);
   assert.doesNotMatch(html, /data-apply-live/);
+  assert.doesNotMatch(html, /data-apply-after-identity/);
 });
 
 test("occupied live later ranks stamp Apply so an applicant can take the hop", () => {
@@ -442,8 +485,9 @@ test("occupied live later ranks stamp Apply so an applicant can take the hop", (
   assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
   assert.equal((html.match(/data-later-apply/g) ?? []).length, 2);
   assert.equal((html.match(/data-apply-later/g) ?? []).length, 2);
+  assert.equal((html.match(/data-apply-after-identity=""/g) ?? []).length, 1);
   assert.doesNotMatch(html.slice(0, later), /data-later-apply|data-apply-later/);
-  assert.doesNotMatch(html.slice(later), /data-take-apply|data-apply-live/);
+  assert.doesNotMatch(html.slice(later), /data-take-apply|data-apply-live|data-apply-after-identity/);
 });
 
 test("ranked fixture cards keep SPEC §3 order in markup", () => {
