@@ -47,8 +47,19 @@ export function Board({
             bid.
           </p>
         </header>
-        {live ? <BidForm lane={lane} defaultAmount={defaultAmount} /> : null}
-        <Leaderboard lane={lane} listings={listings} />
+        {live ? (
+          <BidForm
+            lane={lane}
+            laneName={laneLabel(lane)}
+            defaultAmount={defaultAmount}
+            laneEmpty={listings.length === 0}
+          />
+        ) : null}
+        <Leaderboard
+          lane={lane}
+          listings={listings}
+          hideEmptyChrome={live}
+        />
       </div>
     </main>
   );

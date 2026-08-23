@@ -6,7 +6,9 @@ import { MAX_BID_USD, MIN_BID_USD } from "../../lib/types";
 
 type BidFormProps = {
   lane: FunctionLane;
+  laneName: string;
   defaultAmount: number;
+  laneEmpty?: boolean;
 };
 
 function clampAmount(value: number): number {
@@ -14,11 +16,20 @@ function clampAmount(value: number): number {
   return Math.min(MAX_BID_USD, Math.max(MIN_BID_USD, Math.trunc(value)));
 }
 
-export function BidForm({ lane, defaultAmount }: BidFormProps) {
+export function BidForm({
+  lane,
+  laneName,
+  defaultAmount,
+  laneEmpty = false,
+}: BidFormProps) {
   const [amount, setAmount] = useState(() => clampAmount(defaultAmount));
 
   return (
-    <section className="claim" id="claim">
+    <section
+      className="claim"
+      id="claim"
+      data-lane-empty={laneEmpty ? "true" : "false"}
+    >
       <form
         action="/checkout"
         method="post"
@@ -62,9 +73,18 @@ export function BidForm({ lane, defaultAmount }: BidFormProps) {
           </span>
         </h2>
         <p className="claim-note">
-          One action: claim this lane&apos;s #1. New spots start at $
-          {MIN_BID_USD}. Paying less than #1 still lists at the rank that bid
-          can take.
+          {laneEmpty ? (
+            <>
+              This week&apos;s {laneName} lane is empty. ${MIN_BID_USD} takes
+              #1. Nobody is invented here.
+            </>
+          ) : (
+            <>
+              One action: claim this lane&apos;s #1. New spots start at $
+              {MIN_BID_USD}. Paying less than #1 still lists at the rank that
+              bid can take.
+            </>
+          )}
         </p>
         <div className="bid-row">
           <input
@@ -79,9 +99,11 @@ export function BidForm({ lane, defaultAmount }: BidFormProps) {
             Outbid
           </button>
         </div>
-        <p className="raise-hint">
-          Already on this lane? Enter the same apply URL or handle and raise.
-        </p>
+        {laneEmpty ? null : (
+          <p className="raise-hint">
+            Already on this lane? Enter the same apply URL or handle and raise.
+          </p>
+        )}
       </form>
     </section>
   );
