@@ -64,6 +64,7 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
               className="list-after-apply"
               href="#claim"
               data-list-after-apply=""
+              data-list-after-apply-first=""
             >
               List a role
             </a>{" "}
