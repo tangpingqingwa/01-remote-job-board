@@ -586,32 +586,41 @@ a:hover {
   box-shadow: 3px 3px 0 rgba(26, 33, 24, 0.18);
 }
 
+.job-sheet[data-take-apply] .sheet-apply[data-apply-after-identity]
+  .apply[data-apply-live][data-first-click="apply"] {
+  min-height: 3.15rem;
+  padding: 0.7rem 1.4rem;
+  font-size: 1.2rem;
+  letter-spacing: 0.1em;
+  box-shadow: 5px 5px 0 rgba(26, 33, 24, 0.24);
+}
+
 .job-sheet[data-take-apply] .list-after-apply-wrap {
-  margin: 0.45rem 0 0;
+  margin: 0.4rem 0 0;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   line-height: 1.4;
 }
 
 .list-after-apply[data-list-after-apply] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.15rem;
-  padding: 0 0.85rem;
-  border: 2px dashed var(--fg);
-  color: var(--fg);
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
   font-family: var(--mono);
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  vertical-align: middle;
+  text-decoration: underline dashed;
+  text-underline-offset: 0.22em;
+  vertical-align: baseline;
 }
 
 .list-after-apply[data-list-after-apply]:hover {
   color: var(--fg);
-  background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
+  background: none;
 }
 
 .apply[data-apply-live]:hover {

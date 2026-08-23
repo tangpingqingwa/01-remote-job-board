@@ -50,7 +50,9 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
             className="apply"
             href={applyClickPath(listing.id)}
             data-apply-url={listing.applyUrl}
-            {...(takeApply ? { "data-apply-live": "" } : {})}
+            {...(takeApply
+              ? { "data-apply-live": "", "data-first-click": "apply" }
+              : {})}
             {...(laterApply ? { "data-apply-later": "" } : {})}
           >
             Apply

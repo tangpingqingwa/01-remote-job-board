@@ -207,6 +207,16 @@ if [[ -f package.json ]]; then
     || fail "rank tests must cover listing after occupied Apply"
   grep -q 'data-list-after-apply' tests/period.test.ts \
     || fail "period tests must keep closed-week history unstamped for list-after-apply"
+  grep -q 'data-first-click": "apply"' src/components/board/listing-card.tsx \
+    || fail "occupied #1 Apply must win the first click after List a role"
+  grep -q 'data-first-click="apply"' src/app/globals.css \
+    || fail "first-click Apply must be louder than List a role after Apply"
+  grep -q 'wins the first click after List a role' tests/rank.test.ts \
+    || fail "rank tests must cover Apply winning the first click after List a role"
+  grep -q 'data-first-click="apply"' tests/rank.test.ts \
+    || fail "rank tests must stamp first-click Apply on occupied #1"
+  grep -q 'data-first-click="apply"' tests/period.test.ts \
+    || fail "period tests must keep closed-week first-click Apply unstamped"
   grep -q 'data-salary' src/components/board/listing-card.tsx \
     || fail "job card must render optional salary as a fact"
   grep -q 'hiring wall' tests/rank.test.ts \
