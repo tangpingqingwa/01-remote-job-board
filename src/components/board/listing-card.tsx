@@ -56,6 +56,18 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
             Apply
           </a>
         </p>
+        {takeApply ? (
+          <p className="list-after-apply-wrap">
+            <a
+              className="list-after-apply"
+              href="#claim"
+              data-list-after-apply=""
+            >
+              List a role
+            </a>{" "}
+            after Apply. Paying less than #1 still lists.
+          </p>
+        ) : null}
         <p className="meta">
           <span className="bid" data-bid="">
             {formatUsd(listing.bidUsd)}
