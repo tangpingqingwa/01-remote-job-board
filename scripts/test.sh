@@ -125,6 +125,8 @@ if [[ -f package.json ]]; then
     || fail "job card must keep Apply as the outbound CTA"
   grep -q 'className="apply"' src/components/board/listing-card.tsx \
     || fail "job card must keep a single Apply control"
+  grep -q 'sheet-apply' src/components/board/listing-card.tsx \
+    || fail "job card must put Apply after the job identity"
   grep -q 'data-salary' src/components/board/listing-card.tsx \
     || fail "job card must render optional salary as a fact"
   grep -q 'hiring wall' tests/rank.test.ts \

@@ -18,27 +18,21 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
       data-listing-id={listing.id}
     >
       <span className="sheet-pin" aria-hidden="true" />
-      <header className="sheet-head">
+      <p className="sheet-rankline">
         <span className="rank">#{listing.rank}</span>
-        <p className="bid" data-bid="">
-          {formatUsd(listing.bidUsd)}
-        </p>
-      </header>
+        <span className="remote">Remote (global)</span>
+      </p>
       <div className="card-body">
         <h3 className="title">{listing.title}</h3>
         <p className="company" data-company="">
           {listing.company}
         </p>
-        <p className="remote">Remote (global)</p>
         {listing.salary ? (
           <p className="salary" data-salary="">
             {formatUsd(listing.salary.minUsd)}–{formatUsd(listing.salary.maxUsd)}
           </p>
         ) : null}
-        <p className="meta">
-          <span className="clicks" data-clicks="">
-            {formatClicks(listing.clicks)}
-          </span>
+        <p className="sheet-apply">
           <a
             className="apply"
             href={applyClickPath(listing.id)}
@@ -46,6 +40,14 @@ export function ListingCard({ listing }: { listing: RankedListing }) {
           >
             Apply
           </a>
+        </p>
+        <p className="meta">
+          <span className="bid" data-bid="">
+            {formatUsd(listing.bidUsd)}
+          </span>
+          <span className="clicks" data-clicks="">
+            {formatClicks(listing.clicks)}
+          </span>
         </p>
       </div>
     </article>

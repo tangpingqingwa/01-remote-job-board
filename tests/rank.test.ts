@@ -161,6 +161,21 @@ test("cards render rank, title, company, $bid, and click count", () => {
   assert.doesNotMatch(html, /\$0|competitive/i);
 });
 
+test("job sheet scans as a job: title, company, Apply, then $bid", () => {
+  const [acme] = rankListings(specTieRows);
+  assert.ok(acme);
+  const html = renderToStaticMarkup(
+    createElement(ListingCard, { listing: acme }),
+  );
+  const title = html.indexOf("Staff Backend Engineer");
+  const company = html.indexOf("data-company");
+  const apply = html.indexOf(">Apply<");
+  const bid = html.indexOf("data-bid");
+  assert.ok(title >= 0 && company > title && apply > company && bid > apply);
+  assert.match(html, /class="sheet-apply"/);
+  assert.doesNotMatch(html, /sheet-head/);
+});
+
 test("board chrome has lane tabs, identity field, amount, and Outbid", () => {
   const html = renderToStaticMarkup(
     createElement(Board, {
