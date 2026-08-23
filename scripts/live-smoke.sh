@@ -49,6 +49,8 @@ OP_POLAR_ACCESS_TOKEN="${POLAR_ACCESS_TOKEN:-}"
 OP_POLAR_WEBHOOK_SECRET="${POLAR_WEBHOOK_SECRET:-}"
 OP_POLAR_PRODUCT_ID="${POLAR_PRODUCT_ID:-}"
 OP_POLAR_FIXTURE_ONLY="${POLAR_FIXTURE_ONLY:-}"
+OP_POLAR_API_BASE="${POLAR_API_BASE:-}"
+OP_POLAR_SUCCESS_URL="${POLAR_SUCCESS_URL:-}"
 
 kill_tree() {
   local pid="${1:-}"
@@ -321,9 +323,17 @@ start_smoke_server() {
     export PORT="${port}"
     export PUBLIC_BASE_URL="http://127.0.0.1:${port}"
     while [[ $# -gt 0 ]]; do
-      export "$1"
+      _assign="$1"
+      _key="${_assign%%=*}"
+      _val="${_assign#*=}"
+      if [[ -z "$_val" ]]; then
+        unset "$_key" || true
+      else
+        export "${_key}=${_val}"
+      fi
       shift
     done
+    unset _assign _key _val
     exec npx --no-install tsx --tsconfig "${root}/tsconfig.test.json" "${server_path}"
   ) >"${log_path}" 2>&1 &
   echo $!
@@ -578,6 +588,8 @@ if [[ "${OP_POLAR_LIVE}" == "1" && "${OP_POLAR_FIXTURE_ONLY}" != "1" ]]; then
       "POLAR_ACCESS_TOKEN=${OP_POLAR_ACCESS_TOKEN}" \
       "POLAR_WEBHOOK_SECRET=${OP_POLAR_WEBHOOK_SECRET:-}" \
       "POLAR_PRODUCT_ID=${OP_POLAR_PRODUCT_ID}" \
+      "POLAR_API_BASE=${OP_POLAR_API_BASE}" \
+      "POLAR_SUCCESS_URL=${OP_POLAR_SUCCESS_URL}" \
       "POLAR_FIXTURE_ONLY=")"
     if ! wait_health "$live_base"; then
       if grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' "${live_log}"; then
@@ -601,8 +613,10 @@ if [[ "${OP_POLAR_LIVE}" == "1" && "${OP_POLAR_FIXTURE_ONLY}" != "1" ]]; then
       http_get "$live_base" "/" "$live_board" >/dev/null || true
       if html_has "$live_board" "live.example/job-${STAMP}"; then
         record "3-new-listing" "FAIL" "unpaid live Polar session appeared on the board"
+      elif [[ "$live_code" =~ ^30[12378]$ && "$live_loc" == https://sandbox.polar.sh/* ]]; then
+        record "3-new-listing" "PASS" "live Polar sandbox Checkout URL; unpaid not listed"
       elif [[ "$live_code" =~ ^30[12378]$ && "$live_loc" == https://*polar.sh* ]]; then
-        record "3-new-listing" "PASS" "live Polar checkout session; unpaid not listed"
+        record "3-new-listing" "FAIL" "Polar checkout host is not sandbox.polar.sh: ${live_loc%%\?*}"
       elif grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' "${live_log}" "$live_body" 2>/dev/null; then
         echo "BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
         record "3-new-listing" "BLOCKED-SECRET" "POLAR_ACCESS_TOKEN"

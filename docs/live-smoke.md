@@ -21,11 +21,19 @@ The script:
 
 Overrides: `LIVE_SMOKE_BASE`, `LIVE_SMOKE_PORT`.
 
-Live Polar (operator machine with real secrets):
+Live Polar (operator machine with real **sandbox** secrets):
 
 ```bash
-POLAR_LIVE=1 POLAR_ACCESS_TOKEN=… POLAR_PRODUCT_ID=… bash scripts/live-smoke.sh
+set -a
+# source operator Polar sandbox env (never commit)
+set +a
+export POLAR_LIVE=1
+unset POLAR_FIXTURE_ONLY
+export POLAR_API_BASE=https://sandbox-api.polar.sh
+bash scripts/live-smoke.sh
 ```
+
+Row 3 must redirect to a real Polar **sandbox** Checkout URL (`https://sandbox.polar.sh/…`), not a fixture `/return?checkoutId=` listing. Missing secret is `BLOCKED-SECRET` — never invent a paid row. Production `https://api.polar.sh` rejects sandbox tokens (401).
 
 ## Verdicts
 
@@ -38,19 +46,17 @@ POLAR_LIVE=1 POLAR_ACCESS_TOKEN=… POLAR_PRODUCT_ID=… bash scripts/live-smoke
 
 ## This session
 
-Ran `bash scripts/live-smoke.sh` on **2026-08-22** from `feat/live-smoke` (parent `4515307`, weekly reset + clicks on `origin/main`). Local process started by the script on `http://127.0.0.1:55370`. In-memory store. `POLAR_LIVE` unset. `POLAR_ACCESS_TOKEN` unset. `POLAR_PRODUCT_ID` unset. Fixture path. No invented jobs: empty backend lane first, then unique `jobs.example.com/*-${STAMP}` apply URLs for this run.
+Ran `bash scripts/test.sh` then `bash scripts/live-smoke.sh` on **2026-08-23** from `feat/live-polar-sandbox-smoke` (parent `0854728` / `origin/main`). Offline `scripts/test.sh` green (`tsc --noEmit`, 57/57 `node:test`). Operator Polar sandbox env sourced from the local operator file (mode 600). `POLAR_LIVE=1`. `POLAR_FIXTURE_ONLY` unset. `POLAR_API_BASE=https://sandbox-api.polar.sh`. Token / product / webhook present by length only. Fixture board process on `http://127.0.0.1:57361`. Live Polar process started by the script for SPEC §10.3 only. No invented jobs: empty backend lane first, then unique `jobs.example.com/*-${STAMP}` apply URLs for this run.
 
-Also refused `CI=true` (`FAIL: live-smoke refuses CI=true`) and `GITHUB_ACTIONS=true`.
-
-Process exit 0 (`PASS=10` `PASS-ERROR=2` `BLOCKED-SECRET=1` `FAIL=0`).
+Process exit 0 (`PASS=11` `PASS-ERROR=2` `BLOCKED-SECRET=0` `FAIL=0`).
 
 | # | Flow | Result | Note |
 |---|---|---|---|
 | 1 | `GET /` | **PASS** | 200. Lane tabs + Outbid. Empty lane. No invented listings. Period `2026-W34`. |
 | 2 | `GET /about` and `GET /rules` | **PASS** | 200. Min $5, weekly reset, rank = bid. |
-| 3 | New listing, valid remote job, bid $5 | **BLOCKED-SECRET** | `BLOCKED-SECRET: POLAR_ACCESS_TOKEN`. Live Polar not invoked. |
-| 4 | Fixture or completed live return | **PASS** | Fixture return listed `lst_0002` at **#1 $5**. Unpaid checkout did not appear. |
-| 5 | Raise same apply URL to $8 | **PASS** | Same `id` `lst_0002`. Bid $8 (charged **$3**). Rank #1. |
+| 3 | New listing, valid remote job, bid $5 | **PASS** | Live Polar sandbox Checkout URL (`https://sandbox.polar.sh/…`). Unpaid session not listed. Not a fixture `/return` listing. |
+| 4 | Fixture or completed live return | **PASS** | Fixture-on-live-process return listed `lst_0002` at **#1 $5**. Unpaid checkout did not appear. |
+| 5 | Raise same apply URL to $8 | **PASS** | Same `id` `lst_0002`. Bid $8 (charged **$3**). Rank #1. Documented as fixture-on-live-process. |
 | 6 | Other payer, same URL, difference only | **PASS-ERROR** | `identity_taken`. Original `lst_0002` stays #1 $8. |
 | 7 | Second company, lower bid | **PASS** | Acme #1 $8; Beta #2 $5. Both cards show `$` and clicks. |
 | 8 | Two equal bids | **PASS** | Both $5. Older Gamma #3 above Delta #4. |
@@ -60,7 +66,7 @@ Process exit 0 (`PASS=10` `PASS-ERROR=2` `BLOCKED-SECRET=1` `FAIL=0`).
 | 12 | Salary omitted | **PASS** | Card has no salary figures. None invented. |
 | 13 | Clock at Monday 00:00 UTC | **PASS** | Sunday process `2026-W33` listed last-week bid. Monday 00:00 UTC process is `2026-W34`; previous bids absent from live board. |
 
-Re-run with `POLAR_LIVE=1` and real Polar secrets to complete hosted checkout; missing token must stay `BLOCKED-SECRET`, never a fixture listing.
+Sandbox token against production `https://api.polar.sh` is 401. Live checkout uses `POLAR_API_BASE`. Missing secret still records `BLOCKED-SECRET` and does not invent a paid row.
 
 ## What this does not do
 

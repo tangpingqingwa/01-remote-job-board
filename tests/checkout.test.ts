@@ -6,7 +6,11 @@ import { currentPeriodMeta } from "../src/lib/period";
 import { draftFromOutbidInput, planCheckout } from "../src/lib/listing";
 import { BoardStore, defaultBoardStore } from "../src/lib/store";
 import { rankListings } from "../src/lib/rank";
-import { isPolarLive } from "../src/payments/env";
+import {
+  DEFAULT_POLAR_API_BASE,
+  isPolarLive,
+  polarApiBase,
+} from "../src/payments/env";
 import { FakePolarPort, resetFixtureIds } from "../src/payments/fixture";
 import { LivePolarPort } from "../src/payments/polar";
 import {
@@ -173,8 +177,75 @@ test("live Polar module is unused unless POLAR_LIVE=1", () => {
       "utf8",
     ) as string;
     assert.match(source, /unused in tests and CI/);
-    assert.doesNotMatch(source, /fetch\(/);
-    assert.doesNotMatch(source, /polar\.sh/);
+    assert.match(source, /polarApiBase/);
+    assert.equal(polarApiBase({}), DEFAULT_POLAR_API_BASE);
+    assert.equal(
+      polarApiBase({ POLAR_API_BASE: "https://sandbox-api.polar.sh/" }),
+      "https://sandbox-api.polar.sh",
+    );
+  } finally {
+    if (previousLive === undefined) delete process.env.POLAR_LIVE;
+    else process.env.POLAR_LIVE = previousLive;
+    if (previousFixture === undefined) delete process.env.POLAR_FIXTURE_ONLY;
+    else process.env.POLAR_FIXTURE_ONLY = previousFixture;
+  }
+});
+
+test("live Polar createCheckout posts to POLAR_API_BASE and does not list unpaid", async () => {
+  const previousLive = process.env.POLAR_LIVE;
+  const previousFixture = process.env.POLAR_FIXTURE_ONLY;
+  process.env.POLAR_LIVE = "1";
+  delete process.env.POLAR_FIXTURE_ONLY;
+  const store = new BoardStore();
+  const calls: { url: string; body: unknown }[] = [];
+  const polar = new LivePolarPort({
+    env: {
+      POLAR_LIVE: "1",
+      POLAR_ACCESS_TOKEN: "polar_oat_test",
+      POLAR_PRODUCT_ID: "prod_test",
+      POLAR_API_BASE: "https://sandbox-api.polar.sh",
+    },
+    store,
+    fetch: async (input, init) => {
+      const url = String(input);
+      const method = String(init?.method ?? "GET").toUpperCase();
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      calls.push({ url, body });
+      if (method === "POST") {
+        assert.equal(url, "https://sandbox-api.polar.sh/v1/checkouts/");
+        return new Response(
+          JSON.stringify({
+            id: "chk_live_sandbox",
+            url: "https://sandbox.polar.sh/checkout/chk_live_sandbox",
+            status: "open",
+          }),
+          { status: 201, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ id: "chk_live_sandbox", status: "open" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  try {
+    const started = await polar.createCheckout({
+      amountUsd: 5,
+      listingDraft: draft(),
+      successUrl: "http://127.0.0.1:3000/return",
+    });
+    assert.equal(started.checkoutId, "chk_live_sandbox");
+    assert.equal(
+      started.url,
+      "https://sandbox.polar.sh/checkout/chk_live_sandbox",
+    );
+    assert.equal(calls.length, 1);
+    assert.deepEqual((calls[0]?.body as { products: string[] }).products, [
+      "prod_test",
+    ]);
+    assert.equal((calls[0]?.body as { amount: number }).amount, 500);
+    assert.equal(store.listPaid("backend", PERIOD).length, 0);
+    assert.equal(await polar.completeCheckout(started.checkoutId), null);
   } finally {
     if (previousLive === undefined) delete process.env.POLAR_LIVE;
     else process.env.POLAR_LIVE = previousLive;

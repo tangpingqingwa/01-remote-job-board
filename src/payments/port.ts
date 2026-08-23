@@ -67,7 +67,7 @@ function assertBidRange(value: number): number {
 }
 
 export function getPolarPort(store: BoardStore = defaultBoardStore): PolarPort {
-  if (isPolarLive()) return new LivePolarPort();
+  if (isPolarLive()) return new LivePolarPort({ store });
   return getFakePolarPort(store);
 }
 
