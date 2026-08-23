@@ -269,6 +269,8 @@ test("closed-week board is read-only history of that period", () => {
   assert.match(html, /Open this week/);
   assert.doesNotMatch(html, /Pay \$5 to list/);
   assert.doesNotMatch(html, /Empty bay/);
+  assert.doesNotMatch(html, /data-empty-bay-list/);
+  assert.doesNotMatch(html, /data-empty-identity/);
   assert.doesNotMatch(html, /data-bid-form/);
   assert.doesNotMatch(html, />Outbid</);
   assert.doesNotMatch(html, /data-list-role/);
