@@ -654,6 +654,19 @@ a:hover {
   background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
 }
 
+.list-after-apply[data-list-after-apply][data-list-after-apply-first][data-list-after-apply-two] {
+  min-width: 9.5rem;
+  min-height: 2.75rem;
+  padding: 0 1.15rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+}
+
+.list-after-apply[data-list-after-apply][data-list-after-apply-first][data-list-after-apply-two]:hover {
+  color: var(--fg);
+  background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
+}
+
 .apply[data-apply-live]:hover {
   color: var(--sheet);
   filter: brightness(1.08);

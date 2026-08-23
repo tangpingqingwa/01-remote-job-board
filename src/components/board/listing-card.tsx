@@ -69,6 +69,7 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
               href="#claim"
               data-list-after-apply=""
               data-list-after-apply-first=""
+              data-list-after-apply-two=""
             >
               List a role
             </a>{" "}
