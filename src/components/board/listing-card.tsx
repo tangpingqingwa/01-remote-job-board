@@ -16,6 +16,7 @@ type ListingCardProps = {
 
 export function ListingCard({ listing, live = true }: ListingCardProps) {
   const takeApply = live && listing.rank === 1;
+  const laterApply = live && listing.rank > 1;
 
   return (
     <article
@@ -24,6 +25,7 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
       data-rank={listing.rank}
       data-listing-id={listing.id}
       {...(takeApply ? { "data-take-apply": "" } : {})}
+      {...(laterApply ? { "data-later-apply": "" } : {})}
     >
       <span className="sheet-pin" aria-hidden="true" />
       <p className="sheet-rankline">
@@ -46,6 +48,7 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
             href={applyClickPath(listing.id)}
             data-apply-url={listing.applyUrl}
             {...(takeApply ? { "data-apply-live": "" } : {})}
+            {...(laterApply ? { "data-apply-later": "" } : {})}
           >
             Apply
           </a>

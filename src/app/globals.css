@@ -517,23 +517,38 @@ a:hover {
   color: var(--primary);
 }
 
-.job-sheet[data-take-apply] .sheet-apply {
+.job-sheet[data-take-apply] .sheet-apply,
+.job-sheet[data-later-apply] .sheet-apply {
   margin-top: 0.85rem;
 }
 
-.apply[data-apply-live] {
+.apply[data-apply-live],
+.apply[data-apply-later] {
   display: inline-block;
   padding: 0.4rem 0.85rem;
   border: 2px solid var(--fg);
-  background: var(--fg);
-  color: var(--sheet);
   font-weight: 700;
   letter-spacing: 0.06em;
+}
+
+.apply[data-apply-live] {
+  background: var(--fg);
+  color: var(--sheet);
 }
 
 .apply[data-apply-live]:hover {
   color: var(--sheet);
   filter: brightness(1.08);
+}
+
+.apply[data-apply-later] {
+  background: var(--sheet);
+  color: var(--fg);
+}
+
+.apply[data-apply-later]:hover {
+  color: var(--fg);
+  background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
 }
 
 .salary {

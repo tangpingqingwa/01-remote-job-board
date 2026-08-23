@@ -334,18 +334,67 @@ test("occupied live sheet stamps Apply as the certain outbound hop", () => {
   assert.doesNotMatch(html.slice(later), /data-take-apply|data-apply-live/);
 });
 
-test("later live ranks keep a quiet Apply hop, not a second take stamp", () => {
+test("later live ranks stamp Apply as the certain hop, not a second #1 take", () => {
   const later = rankListings(specTieRows)[1];
   assert.ok(later);
   const html = renderToStaticMarkup(
     createElement(ListingCard, { listing: later }),
   );
+  const stamp = html.indexOf("data-later-apply");
+  const hop = html.indexOf("data-apply-later");
+  const apply = html.indexOf(">Apply<");
+  const bid = html.indexOf("data-bid");
+  assert.ok(stamp >= 0 && hop > stamp && apply > hop && bid > apply);
   assert.match(html, /data-rank="2"/);
+  assert.match(html, /data-later-apply=""/);
+  assert.match(html, /data-apply-later=""/);
   assert.match(html, />Apply</);
   assert.match(html, /href="\/out\/lst_gamma"/);
   assert.match(html, /class="apply"/);
+  assert.match(html, /class="sheet-apply"/);
   assert.doesNotMatch(html, /data-take-apply/);
   assert.doesNotMatch(html, /data-apply-live/);
+});
+
+test("occupied live later ranks stamp Apply so an applicant can take the hop", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const take = html.indexOf("data-take-apply");
+  const applyLive = html.indexOf("data-apply-live");
+  const later = html.indexOf('data-listing-id="lst_gamma"');
+  const last = html.indexOf('data-listing-id="lst_beta"');
+  const laterStamp = html.indexOf("data-later-apply");
+  const laterHop = html.indexOf("data-apply-later");
+  const laterHref = html.indexOf('href="/out/lst_gamma"');
+  const lastHref = html.indexOf('href="/out/lst_beta"');
+  const listRole = html.indexOf('data-list-role="employer"');
+  assert.ok(take >= 0 && applyLive > take && later > applyLive);
+  assert.ok(laterStamp > later && laterHop > laterStamp);
+  assert.ok(laterHref > later && last > later && lastHref > last);
+  assert.ok(listRole >= 0 && laterStamp > listRole);
+  assert.match(html, /data-period-live="true"/);
+  assert.match(html, /data-later-apply=""/);
+  assert.match(html, /data-apply-later=""/);
+  assert.match(html, /href="\/out\/lst_gamma"/);
+  assert.match(html, /href="\/out\/lst_beta"/);
+  assert.match(html, />Apply</);
+  assert.match(html, /data-take-apply=""/);
+  assert.match(html, /data-apply-live=""/);
+  assert.match(html, /data-list-role="employer"/);
+  assert.match(html, /List a role/);
+  assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
+  assert.equal((html.match(/data-later-apply/g) ?? []).length, 2);
+  assert.equal((html.match(/data-apply-later/g) ?? []).length, 2);
+  assert.doesNotMatch(html.slice(0, later), /data-later-apply|data-apply-later/);
+  assert.doesNotMatch(html.slice(later), /data-take-apply|data-apply-live/);
 });
 
 test("ranked fixture cards keep SPEC §3 order in markup", () => {
