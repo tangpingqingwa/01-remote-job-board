@@ -59,6 +59,7 @@ export function Board({
           lane={lane}
           listings={listings}
           hideEmptyChrome={live}
+          closed={!live}
         />
       </div>
     </main>

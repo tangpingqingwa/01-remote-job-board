@@ -7,12 +7,14 @@ type LeaderboardProps = {
   lane: FunctionLane;
   listings: readonly RankedListing[];
   hideEmptyChrome?: boolean;
+  closed?: boolean;
 };
 
 export function Leaderboard({
   lane,
   listings,
   hideEmptyChrome = false,
+  closed = false,
 }: LeaderboardProps) {
   if (listings.length === 0) {
     if (hideEmptyChrome) {
@@ -26,6 +28,29 @@ export function Leaderboard({
             No listings this period in {laneLabel(lane)}. Rank is the bid. This
             lane is empty. Claim #1 above for ${MIN_BID_USD}. Nobody is invented
             here.
+          </p>
+        </div>
+      );
+    }
+
+    if (closed) {
+      return (
+        <div
+          className="empty-lane"
+          data-empty-lane="true"
+          data-empty-closed="true"
+        >
+          <p className="empty-lane-kicker">Closed week</p>
+          <p>
+            No listings this period in {laneLabel(lane)}. Rank is the bid. This
+            lane was empty. Nobody is invented here.
+          </p>
+          <p>
+            Bids are closed.{" "}
+            <a href={`/?lane=${lane}`} data-live-week="">
+              Open this week&apos;s live {laneLabel(lane)} wall
+            </a>
+            .
           </p>
         </div>
       );
