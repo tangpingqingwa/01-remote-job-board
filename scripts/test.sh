@@ -195,6 +195,18 @@ if [[ -f package.json ]]; then
     || fail "rank tests must cover listing a role on an occupied live wall"
   grep -q 'data-list-role' tests/period.test.ts \
     || fail "period tests must keep closed-week history unstamped for listing"
+  grep -q 'data-list-after-apply' src/components/board/listing-card.tsx \
+    || fail "occupied #1 must stamp List a role after Apply"
+  grep -q 'after Apply' src/components/board/listing-card.tsx \
+    || fail "list-after-apply hop must sit after Apply"
+  grep -q 'href="#claim"' src/components/board/listing-card.tsx \
+    || fail "list-after-apply hop must jump to #claim"
+  grep -q 'list-after-apply' src/app/globals.css \
+    || fail "occupied List a role after Apply must be visually certain"
+  grep -q 'data-list-after-apply' tests/rank.test.ts \
+    || fail "rank tests must cover listing after occupied Apply"
+  grep -q 'data-list-after-apply' tests/period.test.ts \
+    || fail "period tests must keep closed-week history unstamped for list-after-apply"
   grep -q 'data-salary' src/components/board/listing-card.tsx \
     || fail "job card must render optional salary as a fact"
   grep -q 'hiring wall' tests/rank.test.ts \

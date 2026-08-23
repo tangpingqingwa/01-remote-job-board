@@ -219,6 +219,7 @@ a:hover {
 }
 
 .claim {
+  scroll-margin-top: 0.75rem;
   padding: 1rem 1.05rem 1.1rem;
   border: 2px solid var(--fg);
   background: var(--sheet);
@@ -583,6 +584,34 @@ a:hover {
   font-size: 1.05rem;
   letter-spacing: 0.08em;
   box-shadow: 3px 3px 0 rgba(26, 33, 24, 0.18);
+}
+
+.job-sheet[data-take-apply] .list-after-apply-wrap {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.list-after-apply[data-list-after-apply] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.15rem;
+  padding: 0 0.85rem;
+  border: 2px dashed var(--fg);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.list-after-apply[data-list-after-apply]:hover {
+  color: var(--fg);
+  background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
 }
 
 .apply[data-apply-live]:hover {
