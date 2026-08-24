@@ -60,28 +60,38 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
           className="sheet-apply"
           {...(takeApply ? { "data-apply-after-identity": "" } : {})}
         >
-          <a
-            className="apply"
-            href={applyClickPath(listing.id)}
-            data-apply-url={listing.applyUrl}
-            {...(takeApply
-              ? {
-                  "data-apply-live": "",
-                  "data-first-click": "apply",
-                  "data-apply-after-list-first": "",
-                  "data-apply-after-list-two": "",
-                  "data-apply-after-list-three": "",
-                  "data-apply-after-list-four": "",
-                  "data-apply-after-list-five": "",
-                  "data-apply-after-list-six": "",
-                }
-              : {})}
-            {...(laterApply
-              ? { "data-apply-later": "", "data-apply-later-outlined": "" }
-              : {})}
-          >
-            Apply
-          </a>
+          {prize ? (
+            <a
+              className="apply"
+              href={applyClickPath(listing.id)}
+              data-apply-url={listing.applyUrl}
+              {...(takeApply
+                ? {
+                    "data-apply-live": "",
+                    "data-first-click": "apply",
+                    "data-apply-after-list-first": "",
+                    "data-apply-after-list-two": "",
+                    "data-apply-after-list-three": "",
+                    "data-apply-after-list-four": "",
+                    "data-apply-after-list-five": "",
+                    "data-apply-after-list-six": "",
+                  }
+                : {})}
+            >
+              Apply
+            </a>
+          ) : (
+            <a
+              className="later-apply"
+              href={applyClickPath(listing.id)}
+              data-apply-url={listing.applyUrl}
+              {...(laterApply
+                ? { "data-apply-later": "", "data-apply-later-outlined": "" }
+                : {})}
+            >
+              Apply
+            </a>
+          )}
         </p>
         {takeApply ? (
           <p className="list-after-apply-wrap">
