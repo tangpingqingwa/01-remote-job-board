@@ -48,26 +48,6 @@ export function BidForm({
             List a role
           </p>
         ) : null}
-        {laneEmpty ? (
-          <div
-            className="bid-row"
-            data-empty-identity=""
-            data-empty-identity-first=""
-          >
-            <label className="identity-label" htmlFor="identity">
-              Apply URL or company handle
-            </label>
-            <input
-              id="identity"
-              name="identity"
-              placeholder="Apply URL or company handle"
-              autoComplete="off"
-              spellCheck={false}
-              required
-              autoFocus
-            />
-          </div>
-        ) : null}
         <h2 {...(laneEmpty ? { "data-empty-claim": "" } : {})}>
           <span>Claim #1 for</span>
           <span className="amount-stepper">
@@ -87,6 +67,7 @@ export function BidForm({
                 inputMode="numeric"
                 pattern="[0-9]*"
                 value={amount}
+                autoFocus={laneEmpty}
                 onChange={(event) => {
                   const next = Number(event.target.value.replace(/[^\d]/g, ""));
                   setAmount(clampAmount(next || MIN_BID_USD));
@@ -117,28 +98,38 @@ export function BidForm({
             </>
           )}
         </p>
+        {laneEmpty ? (
+          <button
+            type="submit"
+            className="outbid"
+            data-first-click="claim"
+          >
+            Outbid
+          </button>
+        ) : null}
         <div
           className="bid-row"
           {...(listRole ? { "data-one-identity": "" } : {})}
+          {...(laneEmpty
+            ? { "data-empty-identity": "", "data-empty-identity-first": "" }
+            : {})}
         >
+          <label className="identity-label" htmlFor="identity">
+            Apply URL or company handle
+          </label>
+          <input
+            id="identity"
+            name="identity"
+            placeholder="Apply URL or company handle"
+            autoComplete="off"
+            spellCheck={false}
+            required
+          />
           {laneEmpty ? null : (
-            <>
-              <label className="identity-label" htmlFor="identity">
-                Apply URL or company handle
-              </label>
-              <input
-                id="identity"
-                name="identity"
-                placeholder="Apply URL or company handle"
-                autoComplete="off"
-                spellCheck={false}
-                required
-              />
-            </>
+            <button type="submit" className="outbid">
+              Outbid
+            </button>
           )}
-          <button type="submit" className="outbid">
-            Outbid
-          </button>
         </div>
         {laneEmpty ? null : (
           <p className="raise-hint">

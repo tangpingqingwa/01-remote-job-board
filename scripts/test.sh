@@ -147,6 +147,39 @@ if [[ -f package.json ]]; then
     || fail "live empty claim must stamp honesty"
   grep -q 'data-empty-claim' src/components/board/bid-form.tsx \
     || fail "live empty claim must stamp Claim #1 as the honest lead"
+  grep -q 'autoFocus={laneEmpty}' src/components/board/bid-form.tsx \
+    || fail "empty week Claim #1 amount must take focus, not identity"
+  if grep -nE 'name="identity"' src/components/board/bid-form.tsx | grep -q autoFocus; then
+    fail "identity field must not steal empty-week first click"
+  fi
+  grep -q 'data-first-click="claim"' src/components/board/bid-form.tsx \
+    || fail "empty week Outbid must be the certain first click"
+  grep -q 'outbid\[data-first-click="claim"\]' src/app/globals.css \
+    || fail "empty week Outbid first-click must stay visually certain"
+  empty_outbid_rule="$(awk '/\.claim\[data-empty-bay-list\] \.outbid\[data-first-click="claim"\]/,/^\}/' src/app/globals.css)"
+  echo "$empty_outbid_rule" | grep -q 'min-height: 3.15rem' \
+    || fail "empty week Outbid must stay taller than the identity write"
+  if echo "$empty_outbid_rule" | grep -q 'background:'; then
+    fail "empty week Outbid must concentrate first click, not recolor the hiring wall"
+  fi
+  grep -q 'empty week Claim #1 stays the only first click' tests/rank.test.ts \
+    || fail "rank tests must cover empty-week Claim #1 as the only first click"
+  grep -q 'identity field does not steal focus' tests/rank.test.ts \
+    || fail "rank tests must cover identity not stealing empty-week focus"
+  grep -q 'data-first-click="claim"' tests/rank.test.ts \
+    || fail "rank tests must stamp empty-week first-click Claim #1"
+  grep -q 'data-first-click="claim"' tests/period.test.ts \
+    || fail "period tests must keep closed weeks unstamped for first-click Claim #1"
+  if grep -nE 'data-empty-claim-after|data-claim-after-empty-[0-9]|data-empty-claim-first' \
+    src/components/board/bid-form.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "empty Claim #1 first-click must not add a second named hop"
+  fi
+  grep -q 'List a role' src/components/board/bid-form.tsx \
+    || fail "empty Claim #1 cut must keep occupied List a role"
+  grep -q 'data-prize-title' src/components/board/listing-card.tsx \
+    || fail "empty Claim #1 cut must keep occupied #1 prize title"
+  grep -q 'data-apply-later-outlined' src/components/board/listing-card.tsx \
+    || fail "empty Claim #1 cut must keep later-rank Apply outlined"
   grep -q 'data-empty-honest' src/components/board/leaderboard.tsx \
     || fail "empty and closed-empty weeks must stamp honesty"
   grep -q 'data-empty-honest' src/app/globals.css \

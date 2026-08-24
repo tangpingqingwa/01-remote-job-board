@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -9,6 +11,12 @@ import { getBoardListings, parseLane } from "../src/lib/board";
 import { rankListings } from "../src/lib/rank";
 import { FUNCTION_LANES } from "../src/lib/types";
 import { fixtureListing, specTieRows } from "./fixtures/listings";
+
+const cssSource = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+const formSource = readFileSync(
+  join(process.cwd(), "src/components/board/bid-form.tsx"),
+  "utf8",
+);
 
 test("empty input stays empty", () => {
   assert.deepEqual(rankListings([]), []);
@@ -140,7 +148,7 @@ test("empty and closed-empty weeks stay honest — Claim #1, no invented role", 
   const closedMark = closedEmpty.indexOf("data-empty-closed");
   const closedCopy = closedEmpty.indexOf("This lane was empty");
   assert.ok(claim >= 0 && honest > claim && emptyClaim > honest);
-  assert.ok(claimTitle > identity && claimTitle > emptyClaim && outbid > claimTitle);
+  assert.ok(claimTitle > emptyClaim && outbid > claimTitle && identity > outbid);
   assert.ok(closedHonest >= 0 && closedMark >= 0 && closedCopy > closedHonest);
   assert.match(liveEmpty, /data-empty-honest=""/);
   assert.match(liveEmpty, /data-empty-claim=""/);
@@ -249,24 +257,23 @@ test("live empty bay stamps identity as the certain write", () => {
   );
   const claim = html.indexOf('id="claim"');
   const stamp = html.indexOf("data-empty-bay-list");
+  const claimTitle = html.indexOf("Claim #1 for");
+  const amount = html.indexOf('name="amount"');
+  const outbid = html.indexOf(">Outbid<");
   const identityMark = html.indexOf("data-empty-identity");
   const identityFirst = html.indexOf("data-empty-identity-first");
   const label = html.indexOf("identity-label");
   const identity = html.indexOf('name="identity"');
-  const claimTitle = html.indexOf("Claim #1 for");
-  const amount = html.indexOf('name="amount"');
-  const outbid = html.indexOf(">Outbid<");
   const about = html.indexOf("Function lanes");
   assert.ok(claim >= 0 && stamp > claim);
-  assert.ok(identityMark > stamp && identityFirst >= identityMark);
+  assert.ok(claimTitle > stamp && amount > claimTitle && outbid > amount);
+  assert.ok(identityMark > outbid && identityFirst >= identityMark);
   assert.ok(label > identityMark && identity > label);
-  assert.ok(claimTitle > identity && amount > claimTitle && outbid > amount);
   assert.ok(about >= 0 && stamp > about);
   assert.match(html, /data-empty-bay-list=""/);
   assert.match(html, /data-empty-identity=""/);
   assert.match(html, /data-empty-identity-first=""/);
   assert.match(html, /htmlFor="identity"|for="identity"/);
-  assert.match(html, /autofocus/i);
   assert.match(html, /Apply URL or company handle/);
   assert.match(html, /Claim #1 for/);
   assert.match(html, /\$5 takes #1/);
@@ -293,6 +300,89 @@ test("live empty bay stamps identity as the certain write", () => {
   assert.doesNotMatch(html, /data-apply-after-list-five/);
   assert.doesNotMatch(html, /data-apply-after-list-six/);
   assert.doesNotMatch(html, /star rating|chat|discord/i);
+});
+
+test("empty week Claim #1 stays the only first click — identity field does not steal focus", () => {
+  const liveEmpty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const closedEmpty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+      live: false,
+    }),
+  );
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: rankListings(specTieRows),
+    }),
+  );
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: rankListings(specTieRows)[1]! }),
+  );
+  const claim = liveEmpty.indexOf('id="claim"');
+  const claimTitle = liveEmpty.indexOf("Claim #1 for");
+  const amount = liveEmpty.indexOf('name="amount"');
+  const amountFocus = liveEmpty.indexOf("autofocus");
+  const outbid = liveEmpty.indexOf(">Outbid<");
+  const firstClick = liveEmpty.indexOf('data-first-click="claim"');
+  const identity = liveEmpty.indexOf('name="identity"');
+  const identityTagStart = liveEmpty.lastIndexOf("<input", identity);
+  const identityTag = liveEmpty.slice(
+    identityTagStart,
+    liveEmpty.indexOf(">", identity) + 1,
+  );
+  const occupiedPrize = occupied.indexOf("data-prize-title");
+  const occupiedTitle = occupied.indexOf("Staff Backend Engineer");
+  const occupiedBid = occupied.indexOf('data-bid=""');
+  assert.ok(claim >= 0 && claimTitle > claim && amount > claimTitle);
+  assert.ok(amountFocus > claimTitle && amountFocus < outbid);
+  assert.ok(firstClick > amount && firstClick < outbid);
+  assert.ok(outbid > amount && identity > outbid);
+  assert.doesNotMatch(identityTag, /autofocus/i);
+  assert.match(
+    liveEmpty,
+    /<input[^>]*(?:autofocus[^>]*name="amount"|name="amount"[^>]*autofocus)/i,
+  );
+  assert.match(liveEmpty, /data-first-click="claim"/);
+  assert.match(liveEmpty, /Claim #1 for/);
+  assert.match(liveEmpty, />Outbid</);
+  assert.match(liveEmpty, /data-empty-identity-first=""/);
+  assert.doesNotMatch(liveEmpty, /List a role/);
+  assert.doesNotMatch(liveEmpty, /data-list-role/);
+  assert.doesNotMatch(liveEmpty, /data-empty-claim-first/);
+  assert.doesNotMatch(liveEmpty, /data-empty-claim-after|data-claim-after-empty/);
+  assert.doesNotMatch(closedEmpty, /data-first-click="claim"/);
+  assert.doesNotMatch(closedEmpty, /Claim #1 for/);
+  assert.doesNotMatch(closedEmpty, /autofocus/i);
+  assert.doesNotMatch(occupied, /data-first-click="claim"/);
+  assert.doesNotMatch(occupied, /name="amount"[^>]*autofocus/i);
+  assert.match(occupied, /data-list-role="employer"/);
+  assert.match(occupied, /List a role/);
+  assert.match(occupied, /data-prize-title=""/);
+  assert.ok(occupiedPrize >= 0 && occupiedTitle > occupiedPrize && occupiedBid > occupiedTitle);
+  assert.match(laterCard, /data-apply-later-outlined=""/);
+  assert.doesNotMatch(laterCard, /data-prize-title/);
+  assert.match(formSource, /autoFocus=\{laneEmpty\}/);
+  assert.doesNotMatch(formSource, /name="identity"[\s\S]*autoFocus/);
+  const emptyOutbidRule =
+    cssSource.match(
+      /\.claim\[data-empty-bay-list\] \.outbid\[data-first-click="claim"\][\s\S]*?\}/,
+    )?.[0] ?? "";
+  assert.match(emptyOutbidRule, /display:\s*flex/);
+  assert.match(emptyOutbidRule, /min-height:\s*3\.15rem/);
+  assert.doesNotMatch(emptyOutbidRule, /background:/);
 });
 
 test("occupied live wall keeps Outbid and does not hide raise rules", () => {
