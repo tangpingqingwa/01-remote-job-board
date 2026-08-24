@@ -1,4 +1,5 @@
 import { applyClickPath } from "../../lib/clicks";
+import { isPaidListing } from "../../lib/rank";
 import type { RankedListing } from "../../lib/types";
 
 export function formatUsd(amount: number): string {
@@ -15,6 +16,7 @@ type ListingCardProps = {
 };
 
 export function ListingCard({ listing, live = true }: ListingCardProps) {
+  if (!isPaidListing(listing)) return null;
   const prize = listing.rank === 1;
   const takeApply = live && prize;
   const laterApply = live && !prize;

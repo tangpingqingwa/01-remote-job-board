@@ -465,6 +465,37 @@ if [[ -f package.json ]]; then
     src/components/board/listing-card.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "occupied List a role quieter than Apply must not add a second named hop"
   fi
+  grep -q 'export function isPaidListing' src/lib/rank.ts \
+    || fail "rank.ts must expose isPaidListing so unpaid never ranks"
+  grep -q 'export function paidListings' src/lib/rank.ts \
+    || fail "rank.ts must drop unpaid rows before ranking"
+  grep -q 'paidListings(listings)' src/lib/rank.ts \
+    || fail "rankListings must rank paid Polar rows only"
+  grep -q 'isPaidListing(row)' src/lib/store.ts \
+    || fail "store listPaid must drop unpaid rows"
+  grep -q 'if (!isPaidListing(listing)) return;' src/lib/store.ts \
+    || fail "store insertPaid must refuse unpaid occupancy"
+  grep -q 'paidListings(defaultBoardStore.listPaid' src/lib/board.ts \
+    || fail "board loader must compose paid Polar rows only"
+  grep -q 'const paid = rankListings(listings)' src/components/board/board.tsx \
+    || fail "hiring wall occupancy must compose paid Polar rows only"
+  grep -q 'listings={paid}' src/components/board/board.tsx \
+    || fail "hiring wall must pass paid occupancy to the leaderboard"
+  grep -q 'listings = rankListings(listings)' src/components/board/leaderboard.tsx \
+    || fail "leaderboard must drop unpaid occupancy before #1"
+  grep -q 'if (!isPaidListing(listing)) return null' src/components/board/listing-card.tsx \
+    || fail "listing card must not print unpaid #1 / Apply"
+  grep -q 'unpaid stays off the hiring wall' tests/rank.test.ts \
+    || fail "rank tests must keep unpaid occupancy off the hiring wall"
+  grep -q 'No #1 until Polar reports paid' tests/rank.test.ts \
+    || fail "rank tests must wait for Polar paid before #1"
+  grep -q 'closed-week unpaid rows stay off the wall' tests/period.test.ts \
+    || fail "period tests must keep closed-week unpaid occupancy off the wall"
+  if grep -nE 'data-unpaid-off|data-paid-only-wall|data-unpaid-off-board|data-list-after-apply-eight' \
+    src/components/board/listing-card.tsx src/components/board/board.tsx \
+    src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
+    fail "unpaid-off occupancy must not add another named hop"
+  fi
   grep -q 'data-salary' src/components/board/listing-card.tsx \
     || fail "job card must render optional salary as a fact"
   grep -q 'data-prize-title' src/components/board/listing-card.tsx \

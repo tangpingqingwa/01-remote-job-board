@@ -1,3 +1,4 @@
+import { isPaidListing } from "./rank";
 import type { FunctionLane, Listing } from "./types";
 
 /** In-process paid listings and open checkouts. Board never shows unpaid rows. */
@@ -10,7 +11,10 @@ export class BoardStore {
 
   listPaid(lane: FunctionLane, periodId: string): Listing[] {
     return this.listings.filter(
-      (row) => row.lane === lane && row.periodId === periodId,
+      (row) =>
+        row.lane === lane &&
+        row.periodId === periodId &&
+        isPaidListing(row),
     );
   }
 
@@ -33,6 +37,7 @@ export class BoardStore {
   }
 
   insertPaid(listing: Listing): void {
+    if (!isPaidListing(listing)) return;
     this.listings.push(listing);
   }
 

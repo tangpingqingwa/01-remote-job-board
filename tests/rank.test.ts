@@ -22,6 +22,158 @@ test("empty input stays empty", () => {
   assert.deepEqual(rankListings([]), []);
 });
 
+test("unpaid stays off the hiring wall — No #1 until Polar reports paid", () => {
+  const unpaid = fixtureListing({
+    id: "lst_unpaid",
+    company: "Ghost",
+    title: "Unpaid Staff Engineer",
+    bidUsd: 50_000,
+    paidUsd: 0,
+    clicks: 99,
+    createdAt: "2026-08-17T08:00:00.000Z",
+  });
+  const abandoned = fixtureListing({
+    id: "lst_abandoned",
+    company: "Vapor",
+    title: "Abandoned Growth Lead",
+    bidUsd: 9_000,
+    paidUsd: 0,
+    clicks: 12,
+    createdAt: "2026-08-17T08:30:00.000Z",
+  });
+  const paid = fixtureListing({
+    id: "lst_paid_only",
+    company: "Acme",
+    title: "Staff Backend Engineer",
+    bidUsd: 5,
+    paidUsd: 5,
+    clicks: 1,
+    createdAt: "2026-08-17T11:00:00.000Z",
+  });
+
+  assert.deepEqual(rankListings([unpaid, abandoned]), []);
+  const ranked = rankListings([unpaid, abandoned, paid]);
+  assert.equal(ranked.length, 1);
+  assert.equal(ranked[0]?.id, "lst_paid_only");
+  assert.equal(ranked[0]?.rank, 1);
+  assert.equal(ranked[0]?.paidUsd, 5);
+  assert.doesNotMatch(
+    ranked.map((row) => row.id).join(","),
+    /lst_unpaid|lst_abandoned/,
+  );
+
+  const unpaidHtml = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: rankListings([unpaid, abandoned]),
+    }),
+  );
+  const mixedHtml = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: rankListings([unpaid, abandoned, paid]),
+    }),
+  );
+  const leakedHtml = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [
+        { ...unpaid, rank: 1 },
+        { ...paid, rank: 2 },
+      ],
+    }),
+  );
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: rankListings(specTieRows),
+    }),
+  );
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: rankListings(specTieRows)[1]! }),
+  );
+  const unpaidCard = renderToStaticMarkup(
+    createElement(ListingCard, {
+      listing: { ...unpaid, rank: 1 },
+    }),
+  );
+  const closedUnpaid = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: rankListings([unpaid]),
+      live: false,
+    }),
+  );
+
+  assert.equal(unpaidCard, "");
+  assert.match(unpaidHtml, /data-empty-lane="true"/);
+  assert.match(unpaidHtml, /data-first-click="claim"/);
+  assert.match(unpaidHtml, /Claim #1 for/);
+  assert.match(unpaidHtml, /Claim #1, then pick the function/);
+  assert.match(unpaidHtml, /<select[^>]*name="lane"/);
+  assert.doesNotMatch(unpaidHtml, /data-listing-card/);
+  assert.doesNotMatch(unpaidHtml, /data-prize-title/);
+  assert.doesNotMatch(unpaidHtml, /data-prize-pack/);
+  assert.doesNotMatch(unpaidHtml, /data-later-pack/);
+  assert.doesNotMatch(unpaidHtml, /data-take-apply/);
+  assert.doesNotMatch(unpaidHtml, /data-first-click="apply"/);
+  assert.doesNotMatch(unpaidHtml, />Apply</);
+  assert.doesNotMatch(unpaidHtml, /href="\/out\//);
+  assert.doesNotMatch(unpaidHtml, /Ghost|Vapor|Unpaid Staff Engineer|Abandoned Growth Lead/);
+  assert.doesNotMatch(unpaidHtml, /\$50,000|\$9,000/);
+  assert.doesNotMatch(unpaidHtml, /data-list-after-apply-eight|data-list-after-apply-N/);
+  assert.doesNotMatch(unpaidHtml, /wall-rail|wall-plate/);
+
+  assert.match(mixedHtml, /data-prize-title=""/);
+  assert.match(mixedHtml, /Staff Backend Engineer/);
+  assert.match(mixedHtml, /data-listing-id="lst_paid_only"/);
+  assert.match(mixedHtml, /data-first-click="apply"/);
+  assert.match(mixedHtml, /href="\/out\/lst_paid_only"/);
+  assert.match(mixedHtml, />Apply</);
+  assert.match(mixedHtml, /data-list-role="employer"/);
+  assert.equal((mixedHtml.match(/data-listing-card/g) ?? []).length, 1);
+  assert.equal((mixedHtml.match(/data-prize-title=""/g) ?? []).length, 1);
+  assert.doesNotMatch(mixedHtml, /lst_unpaid|lst_abandoned|Ghost|Vapor/);
+  assert.doesNotMatch(mixedHtml, /data-empty-lane/);
+  assert.doesNotMatch(mixedHtml, /data-first-click="claim"/);
+  assert.doesNotMatch(mixedHtml, /<select[^>]*name="lane"/);
+
+  assert.match(leakedHtml, /data-prize-title=""/);
+  assert.match(leakedHtml, /Staff Backend Engineer/);
+  assert.match(leakedHtml, /data-listing-id="lst_paid_only"/);
+  assert.match(leakedHtml, /data-rank="1"/);
+  assert.match(leakedHtml, /data-first-click="apply"/);
+  assert.match(leakedHtml, /href="\/out\/lst_paid_only"/);
+  assert.equal((leakedHtml.match(/data-listing-card/g) ?? []).length, 1);
+  assert.doesNotMatch(leakedHtml, /lst_unpaid|Ghost|Unpaid Staff Engineer/);
+  assert.doesNotMatch(leakedHtml, /data-empty-lane/);
+  assert.doesNotMatch(leakedHtml, /data-first-click="claim"/);
+  assert.doesNotMatch(leakedHtml, /data-rank="2"/);
+
+  assert.match(occupied, /data-prize-title=""/);
+  assert.match(occupied, /data-first-click="apply"/);
+  assert.match(occupied, /Staff Backend Engineer/);
+  assert.match(laterCard, /data-apply-later-outlined=""/);
+  assert.doesNotMatch(laterCard, /data-prize-title/);
+
+  assert.match(closedUnpaid, /data-empty-closed="true"/);
+  assert.match(closedUnpaid, /Bids are closed/);
+  assert.doesNotMatch(closedUnpaid, /data-listing-card/);
+  assert.doesNotMatch(closedUnpaid, /Ghost|Unpaid Staff Engineer/);
+  assert.doesNotMatch(closedUnpaid, />Apply</);
+  assert.doesNotMatch(closedUnpaid, /data-first-click="apply"/);
+});
+
 test("higher bid wins regardless of clicks or recency", () => {
   const low = fixtureListing({
     id: "lst_low",
