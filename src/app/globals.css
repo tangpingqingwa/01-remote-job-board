@@ -796,6 +796,23 @@ a:hover {
   background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
 }
 
+.list-after-apply[data-list-after-apply][data-list-after-apply-first][data-list-after-apply-two][data-list-after-apply-three][data-list-after-apply-four][data-list-after-apply-five][data-list-after-apply-six][data-list-after-apply-seven] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 19.5rem;
+  min-height: 5.25rem;
+  padding: 0 2.4rem;
+  font-size: 1.32rem;
+  letter-spacing: 0.2em;
+}
+
+.list-after-apply[data-list-after-apply][data-list-after-apply-first][data-list-after-apply-two][data-list-after-apply-three][data-list-after-apply-four][data-list-after-apply-five][data-list-after-apply-six][data-list-after-apply-seven]:hover {
+  color: var(--fg);
+  background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
+}
+
 .apply[data-apply-live]:hover {
   color: var(--sheet);
   filter: brightness(1.08);
