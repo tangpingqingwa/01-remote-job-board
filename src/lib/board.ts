@@ -1,4 +1,5 @@
 import { currentPeriodId } from "./period";
+import { paidListings } from "./rank";
 import { defaultBoardStore } from "./store";
 import type { FunctionLane, Listing } from "./types";
 import { FUNCTION_LANES } from "./types";
@@ -34,7 +35,7 @@ export function getBoardListings(
   lane: FunctionLane,
   periodId: string,
 ): Listing[] {
-  return defaultBoardStore.listPaid(lane, periodId);
+  return paidListings(defaultBoardStore.listPaid(lane, periodId));
 }
 
 /** Live query: only the current `periodId` for `now`. Prior weeks are history. */

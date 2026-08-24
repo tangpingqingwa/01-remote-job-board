@@ -1,4 +1,5 @@
 import { laneLabel } from "../../lib/board";
+import { rankListings } from "../../lib/rank";
 import { MIN_BID_USD } from "../../lib/types";
 import type { FunctionLane, RankedListing } from "../../lib/types";
 import { ListingCard } from "./listing-card";
@@ -16,6 +17,7 @@ export function Leaderboard({
   hideEmptyChrome = false,
   closed = false,
 }: LeaderboardProps) {
+  listings = rankListings(listings);
   if (listings.length === 0) {
     if (hideEmptyChrome) {
       return (

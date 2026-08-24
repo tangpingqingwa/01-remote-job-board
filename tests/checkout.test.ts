@@ -81,6 +81,39 @@ test("abandoned checkout does not list", async () => {
   assert.equal(polar.getCheckout(started.checkoutId)?.status, "abandoned");
 });
 
+test("open Polar checkout does not occupy #1 until paid", async () => {
+  const store = new BoardStore();
+  const polar = new FakePolarPort(store);
+  const started = await polar.createCheckout({
+    amountUsd: 5,
+    listingDraft: draft({ company: "Ghost", companyHandle: "ghost" }),
+    successUrl: "http://localhost:3000/return",
+  });
+
+  assert.equal(polar.getCheckout(started.checkoutId)?.status, "open");
+  assert.deepEqual(store.listPaid("backend", PERIOD), []);
+  assert.deepEqual(rankListings(store.listPaid("backend", PERIOD)), []);
+  assert.deepEqual(getBoardListings("backend", PERIOD), []);
+
+  store.insertPaid({
+    id: "lst_unpaid_seed",
+    periodId: PERIOD,
+    lane: "backend",
+    title: "Unpaid Staff Engineer",
+    company: "Ghost",
+    companyHandle: "ghost-unpaid",
+    applyUrl: "https://jobs.example.com/ghost-unpaid",
+    salary: null,
+    bidUsd: 50_000,
+    paidUsd: 0,
+    clicks: 0,
+    createdAt: "2026-08-17T08:00:00.000Z",
+    updatedAt: "2026-08-17T08:00:00.000Z",
+  });
+  assert.deepEqual(store.listPaid("backend", PERIOD), []);
+  assert.deepEqual(rankListings(store.listPaid("backend", PERIOD)), []);
+});
+
 test("handleCheckoutReturn pays on success and not on cancel", async () => {
   const store = new BoardStore();
   const polar = new FakePolarPort(store);

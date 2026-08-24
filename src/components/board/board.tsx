@@ -1,4 +1,5 @@
 import { laneLabel } from "../../lib/board";
+import { rankListings } from "../../lib/rank";
 import type { FunctionLane, RankedListing } from "../../lib/types";
 import { MIN_BID_USD } from "../../lib/types";
 import { BidForm } from "./bid-form";
@@ -20,9 +21,10 @@ export function Board({
   listings,
   live = true,
 }: BoardProps) {
-  const topBid = listings[0]?.bidUsd ?? 0;
+  const paid = rankListings(listings);
+  const topBid = paid[0]?.bidUsd ?? 0;
   const defaultAmount = topBid > 0 ? topBid + 1 : MIN_BID_USD;
-  const laneEmpty = listings.length === 0;
+  const laneEmpty = paid.length === 0;
   const emptyFirst = live && laneEmpty;
   const claimForm = live ? (
     <BidForm
@@ -71,7 +73,7 @@ export function Board({
         {laneEmpty ? claimForm : null}
         <Leaderboard
           lane={lane}
-          listings={listings}
+          listings={paid}
           hideEmptyChrome={live}
           closed={!live}
         />

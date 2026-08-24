@@ -321,6 +321,7 @@ test("closed-week board is read-only history of that period", () => {
   assert.doesNotMatch(html, /data-listing-card/);
   assert.doesNotMatch(html, /href="\/out\//);
   assert.doesNotMatch(html, />Apply</);
+  assert.doesNotMatch(html, /data-unpaid-off|data-paid-only-wall/);
 });
 
 test("closed-week occupied board stays history and still has no checkout", () => {
@@ -409,4 +410,38 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.doesNotMatch(html.slice(html.indexOf('data-listing-id="lst_old_later"')), /class="title"|class="card job-sheet"/);
   assert.doesNotMatch(html.slice(0, html.indexOf('data-listing-id="lst_old_later"')), /data-later-quiet/);
   assert.ok(html.indexOf("data-prize-pack") < html.indexOf("data-later-pack"));
+  assert.doesNotMatch(html, /data-unpaid-off|data-paid-only-wall/);
+});
+
+test("closed-week unpaid rows stay off the wall — no invented occupancy", () => {
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: WEEK_33,
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: rankListings([
+        fixtureListing({
+          id: "lst_old_unpaid",
+          company: "Ghost",
+          title: "Unpaid Staff Engineer",
+          bidUsd: 21,
+          paidUsd: 0,
+          periodId: WEEK_33,
+          createdAt: "2026-08-12T10:00:00.000Z",
+        }),
+      ]),
+      live: false,
+    }),
+  );
+  assert.match(html, /data-empty-closed="true"/);
+  assert.match(html, /data-empty-honest=""/);
+  assert.match(html, /Bids are closed/);
+  assert.match(html, /wall-rail/);
+  assert.doesNotMatch(html, /data-listing-card/);
+  assert.doesNotMatch(html, /data-prize-title/);
+  assert.doesNotMatch(html, /Ghost|Unpaid Staff Engineer/);
+  assert.doesNotMatch(html, />Apply</);
+  assert.doesNotMatch(html, /data-first-click="apply"/);
+  assert.doesNotMatch(html, /data-bid-form/);
+  assert.doesNotMatch(html, /data-unpaid-off|data-paid-only-wall/);
 });
