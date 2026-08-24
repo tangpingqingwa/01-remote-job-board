@@ -33,7 +33,12 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
         <span className="remote">Remote (global)</span>
       </p>
       <div className="card-body">
-        <h3 className="title">{listing.title}</h3>
+        <h3
+          className="title"
+          {...(listing.rank === 1 ? { "data-prize-title": "" } : {})}
+        >
+          {listing.title}
+        </h3>
         <p className="company" data-company="">
           {listing.company}
         </p>

@@ -322,6 +322,59 @@ test("job sheet scans as a job: title, company, Apply, then $bid", () => {
   assert.doesNotMatch(html, /sheet-head/);
 });
 
+test("occupied #1 role title is the prize before $bid + clicks", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: listings[1]! }),
+  );
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const first = html.indexOf('data-listing-id="lst_acme"');
+  const later = html.indexOf('data-listing-id="lst_gamma"');
+  const prize = html.indexOf("data-prize-title");
+  const title = html.indexOf("Staff Backend Engineer");
+  const bid = html.indexOf('data-bid=""');
+  const clicks = html.indexOf('data-clicks=""');
+  const applyHref = html.indexOf('href="/out/lst_acme"');
+  assert.ok(first >= 0 && prize > first && title > prize && later > title);
+  assert.ok(bid > title && clicks > bid && later > clicks);
+  assert.ok(applyHref > title && applyHref < bid);
+  assert.match(html, /data-prize-title=""/);
+  assert.match(html, /data-rank="1"/);
+  assert.match(html, /Staff Backend Engineer/);
+  assert.match(html, /\$21/);
+  assert.match(html, /9 clicks/);
+  assert.match(html, /href="\/out\/lst_acme"/);
+  assert.match(html, /name="identity"/);
+  assert.match(html, /Claim #1 for/);
+  assert.match(html, />Outbid</);
+  assert.equal((html.match(/data-prize-title=""/g) ?? []).length, 1);
+  assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
+  assert.doesNotMatch(html.slice(later), /data-prize-title/);
+  assert.doesNotMatch(laterCard, /data-prize-title/);
+  assert.match(laterCard, /data-rank="2"/);
+  assert.match(laterCard, /data-apply-later=""/);
+  assert.match(laterCard, /Platform Engineer/);
+  assert.match(empty, /data-empty-lane="true"/);
+  assert.match(empty, /data-empty-bay-list=""/);
+  assert.doesNotMatch(empty, /data-prize-title/);
+  assert.doesNotMatch(empty, /data-listing-card/);
+});
+
 test("board chrome has lane tabs, identity field, amount, and Outbid", () => {
   const html = renderToStaticMarkup(
     createElement(Board, {
