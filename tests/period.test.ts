@@ -251,6 +251,7 @@ test("click count is public on the card and Apply uses /out/:id", () => {
   assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /data-apply-after-list-four=""/);
   assert.match(html, /data-apply-after-list-five=""/);
+  assert.match(html, /data-apply-after-list-six=""/);
   assert.doesNotMatch(html, /utm_/);
 });
 
@@ -297,6 +298,7 @@ test("closed-week board is read-only history of that period", () => {
   assert.doesNotMatch(html, /data-apply-after-list-three/);
   assert.doesNotMatch(html, /data-apply-after-list-four/);
   assert.doesNotMatch(html, /data-apply-after-list-five/);
+  assert.doesNotMatch(html, /data-apply-after-list-six/);
 });
 
 test("closed-week occupied board stays history and still has no checkout", () => {
@@ -358,4 +360,5 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.doesNotMatch(html, /data-apply-after-list-three/);
   assert.doesNotMatch(html, /data-apply-after-list-four/);
   assert.doesNotMatch(html, /data-apply-after-list-five/);
+  assert.doesNotMatch(html, /data-apply-after-list-six/);
 });
