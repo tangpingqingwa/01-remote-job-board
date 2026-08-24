@@ -161,6 +161,9 @@ test("empty and closed-empty weeks stay honest — Claim #1, no invented role", 
   assert.doesNotMatch(liveEmpty, /data-prize-title/);
   assert.doesNotMatch(liveEmpty, /data-later-fact/);
   assert.doesNotMatch(liveEmpty, /data-later-quiet/);
+  assert.doesNotMatch(liveEmpty, /data-later-pack/);
+  assert.doesNotMatch(liveEmpty, /data-prize-pack/);
+  assert.doesNotMatch(liveEmpty, /data-later-role/);
   assert.doesNotMatch(liveEmpty, /data-listing-card/);
   assert.doesNotMatch(liveEmpty, /data-take-apply/);
   assert.doesNotMatch(liveEmpty, /data-later-apply/);
@@ -180,6 +183,9 @@ test("empty and closed-empty weeks stay honest — Claim #1, no invented role", 
   assert.doesNotMatch(closedEmpty, /data-prize-title/);
   assert.doesNotMatch(closedEmpty, /data-later-fact/);
   assert.doesNotMatch(closedEmpty, /data-later-quiet/);
+  assert.doesNotMatch(closedEmpty, /data-later-pack/);
+  assert.doesNotMatch(closedEmpty, /data-prize-pack/);
+  assert.doesNotMatch(closedEmpty, /data-later-role/);
   assert.doesNotMatch(closedEmpty, /data-listing-card/);
   assert.doesNotMatch(closedEmpty, /data-take-apply/);
   assert.doesNotMatch(closedEmpty, /data-later-apply/);
@@ -195,6 +201,9 @@ test("empty and closed-empty weeks stay honest — Claim #1, no invented role", 
   assert.match(occupied, /data-prize-title=""/);
   assert.match(occupied, /data-later-fact=""/);
   assert.match(occupied, /data-later-quiet=""/);
+  assert.match(occupied, /data-prize-pack=""/);
+  assert.match(occupied, /data-later-pack=""/);
+  assert.match(occupied, /data-later-role=""/);
   assert.match(occupied, /href="\/out\/lst_acme"/);
   assert.match(occupied, />Apply</);
 });
@@ -220,6 +229,9 @@ test("live empty bay yields the claim box as the only action", () => {
   assert.doesNotMatch(html, /data-prize-title/);
   assert.doesNotMatch(html, /data-later-fact/);
   assert.doesNotMatch(html, /data-later-quiet/);
+  assert.doesNotMatch(html, /data-later-pack/);
+  assert.doesNotMatch(html, /data-prize-pack/);
+  assert.doesNotMatch(html, /data-later-role/);
   assert.doesNotMatch(html, /href="\/out\//);
   assert.doesNotMatch(html, />Apply</);
   assert.doesNotMatch(html, /Pay \$5 to list/);
@@ -562,6 +574,7 @@ test("occupied #1 role title is the prize before $bid + clicks", () => {
   assert.match(laterCard, /data-apply-later=""/);
   assert.match(laterCard, /data-apply-later-outlined=""/);
   assert.match(laterCard, /data-later-quiet=""/);
+  assert.match(laterCard, /data-later-role=""/);
   assert.match(laterCard, /Platform Engineer/);
   assert.match(empty, /data-empty-lane="true"/);
   assert.match(empty, /data-empty-bay-list=""/);
@@ -569,6 +582,8 @@ test("occupied #1 role title is the prize before $bid + clicks", () => {
   assert.doesNotMatch(empty, /data-prize-title/);
   assert.doesNotMatch(empty, /data-later-fact/);
   assert.doesNotMatch(empty, /data-later-quiet/);
+  assert.doesNotMatch(empty, /data-later-pack/);
+  assert.doesNotMatch(empty, /data-later-role/);
   assert.doesNotMatch(empty, /data-listing-card/);
 });
 
@@ -663,17 +678,24 @@ test("occupied later ranks stay quieter than occupied #1", () => {
   const later = html.indexOf('data-listing-id="lst_gamma"');
   const last = html.indexOf('data-listing-id="lst_beta"');
   const prize = html.indexOf("data-prize-title");
+  const prizePack = html.indexOf("data-prize-pack");
+  const laterPack = html.indexOf("data-later-pack");
+  const laterRole = html.indexOf("data-later-role");
   const laterQuiet = html.indexOf("data-later-quiet");
   const lastQuiet = html.lastIndexOf("data-later-quiet");
   const laterApply = html.indexOf("data-apply-later");
   const laterHref = html.indexOf('href="/out/lst_gamma"');
   const lastHref = html.indexOf('href="/out/lst_beta"');
   assert.ok(first >= 0 && prize > first && later > prize);
-  assert.ok(laterQuiet > later && last > later && lastQuiet > last);
+  assert.ok(prizePack >= 0 && prizePack < first && laterPack > prize && later > laterPack);
+  assert.ok(laterRole > later && laterQuiet > later && last > later && lastQuiet > last);
   assert.ok(laterHref > laterQuiet && laterApply > laterHref);
   assert.ok(lastHref > last);
   assert.match(html, /data-prize-title=""/);
   assert.match(html, /data-later-quiet=""/);
+  assert.match(html, /data-prize-pack=""/);
+  assert.match(html, /data-later-pack=""/);
+  assert.match(html, /data-later-role=""/);
   assert.match(html, /data-apply-later=""/);
   assert.match(html, /href="\/out\/lst_gamma"/);
   assert.match(html, /href="\/out\/lst_beta"/);
@@ -682,19 +704,26 @@ test("occupied later ranks stay quieter than occupied #1", () => {
   assert.match(html, /name="identity"/);
   assert.equal((html.match(/data-prize-title=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-later-quiet=""/g) ?? []).length, 2);
+  assert.equal((html.match(/data-prize-pack=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-later-pack=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-later-role=""/g) ?? []).length, 2);
   assert.equal((html.match(/data-apply-later=""/g) ?? []).length, 2);
   assert.doesNotMatch(html.slice(0, later), /data-later-quiet/);
   assert.doesNotMatch(html.slice(later), /data-prize-title/);
   assert.match(laterCard, /data-later-quiet=""/);
+  assert.match(laterCard, /data-later-role=""/);
   assert.match(laterCard, /data-apply-later=""/);
   assert.match(laterCard, /href="\/out\/lst_gamma"/);
   assert.doesNotMatch(laterCard, /data-prize-title/);
   assert.doesNotMatch(laterCard, /data-apply-live/);
   assert.match(lastCard, /data-later-quiet=""/);
+  assert.match(lastCard, /data-later-role=""/);
   assert.match(lastCard, /href="\/out\/lst_beta"/);
   assert.match(empty, /data-empty-lane="true"/);
   assert.match(empty, /data-empty-quiet="true"/);
   assert.doesNotMatch(empty, /data-later-quiet/);
+  assert.doesNotMatch(empty, /data-later-pack/);
+  assert.doesNotMatch(empty, /data-later-role/);
   assert.doesNotMatch(empty, /data-listing-card/);
 });
 
@@ -1206,6 +1235,7 @@ test("later live ranks stamp Apply as the certain hop, not a second #1 take", ()
   assert.match(html, /data-apply-later=""/);
   assert.match(html, /data-apply-later-outlined=""/);
   assert.match(html, /data-later-quiet=""/);
+  assert.match(html, /data-later-role=""/);
   assert.match(html, />Apply</);
   assert.match(html, /href="\/out\/lst_gamma"/);
   assert.match(html, /class="apply"/);
