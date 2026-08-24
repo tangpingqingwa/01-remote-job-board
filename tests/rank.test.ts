@@ -104,6 +104,88 @@ test("empty lane markup is honest", () => {
   assert.doesNotMatch(html, /Acme|Beta|Gamma|competitive salary/i);
 });
 
+test("empty and closed-empty weeks stay honest — Claim #1, no invented role", () => {
+  const liveEmpty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const closedEmpty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+      live: false,
+    }),
+  );
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: rankListings(specTieRows),
+    }),
+  );
+  const claim = liveEmpty.indexOf('id="claim"');
+  const honest = liveEmpty.indexOf("data-empty-honest");
+  const emptyClaim = liveEmpty.indexOf("data-empty-claim");
+  const claimTitle = liveEmpty.indexOf("Claim #1 for");
+  const identity = liveEmpty.indexOf('name="identity"');
+  const outbid = liveEmpty.indexOf(">Outbid<");
+  const closedHonest = closedEmpty.indexOf("data-empty-honest");
+  const closedMark = closedEmpty.indexOf("data-empty-closed");
+  const closedCopy = closedEmpty.indexOf("This lane was empty");
+  assert.ok(claim >= 0 && honest > claim && emptyClaim > honest);
+  assert.ok(claimTitle > identity && claimTitle > emptyClaim && outbid > claimTitle);
+  assert.ok(closedHonest >= 0 && closedMark >= 0 && closedCopy > closedHonest);
+  assert.match(liveEmpty, /data-empty-honest=""/);
+  assert.match(liveEmpty, /data-empty-claim=""/);
+  assert.match(liveEmpty, /Claim #1 for/);
+  assert.match(liveEmpty, /\$5 takes #1/);
+  assert.match(liveEmpty, /data-empty-lane="true"/);
+  assert.match(liveEmpty, /name="identity"/);
+  assert.equal((liveEmpty.match(/name="identity"/g) ?? []).length, 1);
+  assert.equal((liveEmpty.match(/data-empty-honest=""/g) ?? []).length, 2);
+  assert.doesNotMatch(liveEmpty, /data-prize-title/);
+  assert.doesNotMatch(liveEmpty, /data-later-quiet/);
+  assert.doesNotMatch(liveEmpty, /data-listing-card/);
+  assert.doesNotMatch(liveEmpty, /data-take-apply/);
+  assert.doesNotMatch(liveEmpty, /data-later-apply/);
+  assert.doesNotMatch(liveEmpty, /data-apply-live/);
+  assert.doesNotMatch(liveEmpty, /data-apply-later/);
+  assert.doesNotMatch(liveEmpty, /href="\/out\//);
+  assert.doesNotMatch(liveEmpty, />Apply</);
+  assert.doesNotMatch(liveEmpty, /data-list-role/);
+  assert.match(closedEmpty, /data-empty-honest=""/);
+  assert.match(closedEmpty, /data-empty-closed="true"/);
+  assert.match(closedEmpty, /Bids are closed/);
+  assert.match(closedEmpty, /This lane was empty/);
+  assert.match(closedEmpty, /data-live-week=""/);
+  assert.doesNotMatch(closedEmpty, /data-empty-claim/);
+  assert.doesNotMatch(closedEmpty, /Claim #1 for/);
+  assert.doesNotMatch(closedEmpty, /data-prize-title/);
+  assert.doesNotMatch(closedEmpty, /data-later-quiet/);
+  assert.doesNotMatch(closedEmpty, /data-listing-card/);
+  assert.doesNotMatch(closedEmpty, /data-take-apply/);
+  assert.doesNotMatch(closedEmpty, /data-later-apply/);
+  assert.doesNotMatch(closedEmpty, /data-apply-live/);
+  assert.doesNotMatch(closedEmpty, /data-apply-later/);
+  assert.doesNotMatch(closedEmpty, /href="\/out\//);
+  assert.doesNotMatch(closedEmpty, />Apply</);
+  assert.doesNotMatch(closedEmpty, /data-bid-form/);
+  assert.doesNotMatch(closedEmpty, />Outbid</);
+  assert.doesNotMatch(occupied, /data-empty-honest/);
+  assert.doesNotMatch(occupied, /data-empty-claim/);
+  assert.match(occupied, /data-prize-title=""/);
+  assert.match(occupied, /data-later-quiet=""/);
+  assert.match(occupied, /href="\/out\/lst_acme"/);
+  assert.match(occupied, />Apply</);
+});
+
 test("live empty bay yields the claim box as the only action", () => {
   const html = renderToStaticMarkup(
     createElement(Board, {
@@ -115,11 +197,17 @@ test("live empty bay yields the claim box as the only action", () => {
   );
   assert.match(html, /data-empty-lane="true"/);
   assert.match(html, /data-empty-quiet="true"/);
+  assert.match(html, /data-empty-honest=""/);
+  assert.match(html, /data-empty-claim=""/);
   assert.match(html, /data-lane-empty="true"/);
   assert.match(html, /data-empty-bay-list=""/);
   assert.match(html, /\$5 takes #1/);
   assert.match(html, />Outbid</);
   assert.match(html, /Nobody is invented here/);
+  assert.doesNotMatch(html, /data-prize-title/);
+  assert.doesNotMatch(html, /data-later-quiet/);
+  assert.doesNotMatch(html, /href="\/out\//);
+  assert.doesNotMatch(html, />Apply</);
   assert.doesNotMatch(html, /Pay \$5 to list/);
   assert.doesNotMatch(html, /Empty bay/);
   assert.doesNotMatch(html, /Already on this lane/);
@@ -228,6 +316,8 @@ test("occupied live wall keeps Outbid and does not hide raise rules", () => {
   assert.match(html, /name="identity"/);
   assert.doesNotMatch(html, /data-empty-lane/);
   assert.doesNotMatch(html, /data-empty-bay-list/);
+  assert.doesNotMatch(html, /data-empty-honest/);
+  assert.doesNotMatch(html, /data-empty-claim/);
   assert.doesNotMatch(html, /data-empty-identity/);
   assert.doesNotMatch(html, /data-empty-identity-first/);
   assert.doesNotMatch(html, /identity-label/);

@@ -30,7 +30,9 @@ export function BidForm({
       className="claim"
       id="claim"
       data-lane-empty={laneEmpty ? "true" : "false"}
-      {...(laneEmpty ? { "data-empty-bay-list": "" } : {})}
+      {...(laneEmpty
+        ? { "data-empty-bay-list": "", "data-empty-honest": "" }
+        : {})}
       {...(listRole ? { "data-list-role": "employer" } : {})}
       aria-label={listRole ? "List a role" : undefined}
     >
@@ -66,7 +68,7 @@ export function BidForm({
             />
           </div>
         ) : null}
-        <h2>
+        <h2 {...(laneEmpty ? { "data-empty-claim": "" } : {})}>
           <span>Claim #1 for</span>
           <span className="amount-stepper">
             <button

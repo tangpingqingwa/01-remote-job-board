@@ -270,6 +270,7 @@ test("closed-week board is read-only history of that period", () => {
   assert.match(html, /Closed week/);
   assert.match(html, /period=2026-W33/);
   assert.match(html, /data-empty-closed="true"/);
+  assert.match(html, /data-empty-honest=""/);
   assert.match(html, /Bids are closed/);
   assert.match(html, /This lane was empty/);
   assert.match(html, /data-live-week=""/);
@@ -302,6 +303,11 @@ test("closed-week board is read-only history of that period", () => {
   assert.doesNotMatch(html, /data-apply-after-list-six/);
   assert.doesNotMatch(html, /data-prize-title/);
   assert.doesNotMatch(html, /data-later-quiet/);
+  assert.doesNotMatch(html, /data-empty-claim/);
+  assert.doesNotMatch(html, /Claim #1 for/);
+  assert.doesNotMatch(html, /data-listing-card/);
+  assert.doesNotMatch(html, /href="\/out\//);
+  assert.doesNotMatch(html, />Apply</);
 });
 
 test("closed-week occupied board stays history and still has no checkout", () => {
