@@ -128,6 +128,16 @@ a:hover {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.wall-bay > .wall-rail-kicker {
+  margin-top: 1.5rem;
+}
+
+.wall-bay > .lane-tabs {
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: 0.45rem;
+}
+
 .wall-rail {
   position: sticky;
   top: 0.75rem;

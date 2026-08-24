@@ -375,6 +375,8 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.doesNotMatch(html, /<select[^>]*name="lane"/);
   assert.match(html, /wall-rail/);
   assert.match(html, /wall-plate/);
+  assert.ok(html.indexOf("wall-rail") < html.indexOf("data-prize-title"));
+  assert.ok(html.indexOf("wall-rail") < html.indexOf(">Apply<"));
   assert.doesNotMatch(html, /data-one-identity/);
   assert.doesNotMatch(html, /data-list-after-apply/);
   assert.doesNotMatch(html, /data-list-after-apply-first/);

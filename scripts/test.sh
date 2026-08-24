@@ -196,6 +196,24 @@ if [[ -f package.json ]]; then
     src/components/board/bid-form.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "empty week function pick must not add another named hop"
   fi
+  grep -q 'occupiedLive ? null' src/components/board/board.tsx \
+    || fail "occupied live wall must not hang eight Function-lane plates in the wall rail"
+  grep -q 'occupiedLive ? lanePlates' src/components/board/board.tsx \
+    || fail "occupied live wall must keep Function-lane plates after the listing"
+  grep -q 'wall-bay > .lane-tabs' src/app/globals.css \
+    || fail "occupied Function-lane plates after the listing must stay visually certain"
+  grep -q 'occupied wall keeps one first click' tests/rank.test.ts \
+    || fail "rank tests must cover occupied Apply as the one first click"
+  grep -q 'function plates stay after the listing' tests/rank.test.ts \
+    || fail "rank tests must keep occupied Function-lane plates after the listing"
+  grep -q 'doesNotMatch(occupied, /class="wall-rail"/)' tests/rank.test.ts \
+    || fail "rank tests must drop the occupied wall rail before Apply"
+  grep -q 'wall-rail' tests/period.test.ts \
+    || fail "period tests must keep closed weeks on the occupied wall rail"
+  if grep -nE 'data-occupied-plates|data-plates-after-listing|data-apply-one-first|data-lane-after-listing' \
+    src/components/board/board.tsx src/components/board/listing-card.tsx src/app/globals.css >/dev/null; then
+    fail "occupied Apply first-click must not add another named hop"
+  fi
   grep -q 'List a role' src/components/board/bid-form.tsx \
     || fail "empty Claim #1 cut must keep occupied List a role"
   grep -q 'data-prize-title' src/components/board/listing-card.tsx \

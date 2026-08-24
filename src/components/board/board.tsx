@@ -26,6 +26,7 @@ export function Board({
   const defaultAmount = topBid > 0 ? topBid + 1 : MIN_BID_USD;
   const laneEmpty = paid.length === 0;
   const emptyFirst = live && laneEmpty;
+  const occupiedLive = live && !laneEmpty;
   const claimForm = live ? (
     <BidForm
       lane={lane}
@@ -34,6 +35,12 @@ export function Board({
       laneEmpty={laneEmpty}
     />
   ) : null;
+  const lanePlates = (
+    <>
+      <p className="wall-rail-kicker">Function lanes</p>
+      <LaneTabs lane={lane} periodId={live ? undefined : periodId} />
+    </>
+  );
 
   return (
     <main
@@ -43,11 +50,8 @@ export function Board({
       data-lane={lane}
       data-period-live={live ? "true" : "false"}
     >
-      {emptyFirst ? null : (
-        <aside className="wall-rail">
-          <p className="wall-rail-kicker">Function lanes</p>
-          <LaneTabs lane={lane} periodId={live ? undefined : periodId} />
-        </aside>
+      {emptyFirst ? null : occupiedLive ? null : (
+        <aside className="wall-rail">{lanePlates}</aside>
       )}
       <div className="wall-bay">
         <header className="wall-mast">
@@ -77,6 +81,7 @@ export function Board({
           hideEmptyChrome={live}
           closed={!live}
         />
+        {occupiedLive ? lanePlates : null}
         {laneEmpty ? null : claimForm}
       </div>
     </main>
