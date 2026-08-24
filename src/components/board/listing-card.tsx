@@ -69,7 +69,9 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
                   "data-apply-after-list-six": "",
                 }
               : {})}
-            {...(laterApply ? { "data-apply-later": "" } : {})}
+            {...(laterApply
+              ? { "data-apply-later": "", "data-apply-later-outlined": "" }
+              : {})}
           >
             Apply
           </a>
