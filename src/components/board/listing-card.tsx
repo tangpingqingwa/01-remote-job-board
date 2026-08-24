@@ -17,6 +17,7 @@ type ListingCardProps = {
 export function ListingCard({ listing, live = true }: ListingCardProps) {
   const takeApply = live && listing.rank === 1;
   const laterApply = live && listing.rank > 1;
+  const laterQuiet = listing.rank > 1;
 
   return (
     <article
@@ -26,6 +27,7 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
       data-listing-id={listing.id}
       {...(takeApply ? { "data-take-apply": "" } : {})}
       {...(laterApply ? { "data-later-apply": "" } : {})}
+      {...(laterQuiet ? { "data-later-quiet": "" } : {})}
     >
       <span className="sheet-pin" aria-hidden="true" />
       <p className="sheet-rankline">

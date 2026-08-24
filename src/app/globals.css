@@ -490,9 +490,7 @@ a:hover {
   color: var(--muted);
 }
 
-.card[data-rank="1"] .rank,
-.card[data-rank="2"] .rank,
-.card[data-rank="3"] .rank {
+.card[data-rank="1"] .rank {
   color: var(--primary-fg);
   background: var(--primary);
   border-radius: 0;
@@ -518,6 +516,25 @@ a:hover {
   font-size: clamp(1.55rem, 3.2vw, 1.95rem);
   line-height: 1.12;
   letter-spacing: -0.04em;
+}
+
+.job-sheet[data-later-quiet] {
+  min-height: 10.25rem;
+  padding: 0.95rem 0.9rem 0.8rem;
+  box-shadow: 2px 2px 0 rgba(26, 33, 24, 0.04);
+}
+
+.job-sheet[data-later-quiet] .sheet-pin {
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-left: -0.225rem;
+  opacity: 0.45;
+}
+
+.job-sheet[data-later-quiet] .title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .card[data-rank="1"] .meta {
@@ -580,13 +597,20 @@ a:hover {
   margin-top: 1rem;
 }
 
-.apply[data-apply-live],
-.apply[data-apply-later] {
+.apply[data-apply-live] {
   display: inline-block;
   padding: 0.4rem 0.85rem;
   border: 2px solid var(--fg);
   font-weight: 700;
   letter-spacing: 0.06em;
+}
+
+.apply[data-apply-later] {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--fg);
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .apply[data-apply-live] {
@@ -835,7 +859,7 @@ a:hover {
 }
 
 .apply[data-apply-later] {
-  background: var(--sheet);
+  background: transparent;
   color: var(--fg);
 }
 
