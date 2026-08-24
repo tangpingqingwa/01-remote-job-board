@@ -289,6 +289,18 @@ if [[ -f package.json ]]; then
     || fail "rank tests must stamp Apply after List a role is re-concentrated again"
   grep -q 'data-apply-after-list-three' tests/period.test.ts \
     || fail "period tests must keep closed-week Apply after List a role is re-concentrated again unstamped"
+  grep -q 'data-apply-after-list-four' src/components/board/listing-card.tsx \
+    || fail "occupied #1 Apply must stay certain after List a role is re-concentrated again without another named hop"
+  grep -q 'data-apply-after-list-four' src/app/globals.css \
+    || fail "Apply after List a role is re-concentrated again must stay a filled hop taller than dashed List"
+  grep -q 'min-height: 5.15rem' src/app/globals.css \
+    || fail "Apply after List a role is re-concentrated again must stay taller than 4.65rem"
+  grep -q 'stays certain after List a role is re-concentrated again without another named hop' tests/rank.test.ts \
+    || fail "rank tests must cover Apply after List a role is re-concentrated again without another named hop"
+  grep -q 'data-apply-after-list-four' tests/rank.test.ts \
+    || fail "rank tests must stamp Apply after List a role is re-concentrated again without another named hop"
+  grep -q 'data-apply-after-list-four' tests/period.test.ts \
+    || fail "period tests must keep closed-week Apply after List a role is re-concentrated again unstamped"
   grep -q 'data-salary' src/components/board/listing-card.tsx \
     || fail "job card must render optional salary as a fact"
   grep -q 'hiring wall' tests/rank.test.ts \

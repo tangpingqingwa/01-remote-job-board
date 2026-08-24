@@ -57,6 +57,7 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
                   "data-apply-after-list-first": "",
                   "data-apply-after-list-two": "",
                   "data-apply-after-list-three": "",
+                  "data-apply-after-list-four": "",
                 }
               : {})}
             {...(laterApply ? { "data-apply-later": "" } : {})}
