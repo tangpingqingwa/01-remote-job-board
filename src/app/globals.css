@@ -736,6 +736,23 @@ a:hover {
   background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
 }
 
+.list-after-apply[data-list-after-apply][data-list-after-apply-first][data-list-after-apply-two][data-list-after-apply-three][data-list-after-apply-four][data-list-after-apply-five] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 15.5rem;
+  min-height: 4.25rem;
+  padding: 0 1.9rem;
+  font-size: 1.12rem;
+  letter-spacing: 0.16em;
+}
+
+.list-after-apply[data-list-after-apply][data-list-after-apply-first][data-list-after-apply-two][data-list-after-apply-three][data-list-after-apply-four][data-list-after-apply-five]:hover {
+  color: var(--fg);
+  background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
+}
+
 .apply[data-apply-live]:hover {
   color: var(--sheet);
   filter: brightness(1.08);
