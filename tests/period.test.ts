@@ -311,6 +311,7 @@ test("closed-week board is read-only history of that period", () => {
   assert.doesNotMatch(html, /data-prize-pack/);
   assert.doesNotMatch(html, /data-later-role/);
   assert.doesNotMatch(html, /data-apply-later-outlined/);
+  assert.doesNotMatch(html, /class="later-apply"/);
   assert.doesNotMatch(html, /data-empty-claim/);
   assert.doesNotMatch(html, /data-first-click="claim"/);
   assert.doesNotMatch(html, /Claim #1 for/);
@@ -405,10 +406,12 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.equal((html.match(/data-later-pack=""/g) ?? []).length, 1);
   assert.match(html, /data-later-role=""/);
   assert.equal((html.match(/data-later-role=""/g) ?? []).length, 1);
+  assert.match(html, /class="later-apply"/);
+  assert.equal((html.match(/class="later-apply"/g) ?? []).length, 1);
   assert.doesNotMatch(html.slice(html.indexOf('data-listing-id="lst_old_later"')), /data-prize-title/);
   assert.doesNotMatch(html.slice(html.indexOf('data-listing-id="lst_old_later"')), /data-later-fact/);
-  assert.doesNotMatch(html.slice(html.indexOf('data-listing-id="lst_old_later"')), /class="title"|class="card job-sheet"/);
-  assert.doesNotMatch(html.slice(0, html.indexOf('data-listing-id="lst_old_later"')), /data-later-quiet/);
+  assert.doesNotMatch(html.slice(html.indexOf('data-listing-id="lst_old_later"')), /class="title"|class="card job-sheet"|class="apply"/);
+  assert.doesNotMatch(html.slice(0, html.indexOf('data-listing-id="lst_old_later"')), /data-later-quiet|class="later-apply"/);
   assert.ok(html.indexOf("data-prize-pack") < html.indexOf("data-later-pack"));
   assert.doesNotMatch(html, /data-unpaid-off|data-paid-only-wall/);
 });

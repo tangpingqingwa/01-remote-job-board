@@ -202,6 +202,8 @@ if [[ -f package.json ]]; then
     || fail "empty Claim #1 cut must keep occupied #1 prize title"
   grep -q 'data-apply-later-outlined' src/components/board/listing-card.tsx \
     || fail "empty Claim #1 cut must keep later-rank Apply outlined"
+  grep -q 'className="later-apply"' src/components/board/listing-card.tsx \
+    || fail "empty Claim #1 cut must keep later-rank Apply as later-apply anatomy"
   grep -q 'data-empty-honest' src/components/board/leaderboard.tsx \
     || fail "empty and closed-empty weeks must stamp honesty"
   grep -q 'data-empty-honest' src/app/globals.css \
@@ -572,6 +574,30 @@ if [[ -f package.json ]]; then
     || fail "rank tests must stamp later-rank titles as later-role"
   grep -q 'data-later-role' tests/period.test.ts \
     || fail "period tests must keep empty/closed weeks honest about later-role titles"
+  grep -q 'className="later-apply"' src/components/board/listing-card.tsx \
+    || fail "later-rank Apply must sit on later-apply, not the #1 filled hop"
+  grep -q 'later-apply' src/app/globals.css \
+    || fail "later-apply roster hop must be visually certain"
+  grep -q 'later-sheet\[data-later-quiet\] \.later-apply' src/app/globals.css \
+    || fail "later-rank Apply must stay outlined by later-apply anatomy"
+  later_apply_rule="$(awk '/\.later-sheet\[data-later-quiet\] \.later-apply\[data-apply-later\]\[data-apply-later-outlined\] \{/,/^\}/' src/app/globals.css)"
+  echo "$later_apply_rule" | grep -q 'border: 1px solid var(--fg)' \
+    || fail "later-rank Apply must stay an outline, not a filled #1 hop"
+  echo "$later_apply_rule" | grep -q 'background: transparent' \
+    || fail "later-rank Apply must stay outlined, not filled like occupied #1"
+  if echo "$later_apply_rule" | grep -q 'var(--sheet)'; then
+    fail "later-rank Apply must recede by anatomy, not fill like occupied #1"
+  fi
+  if grep -nE 'data-later-quiet\] \.apply[^-]|[^a-z-]apply\[data-apply-later\]|[^a-z-]apply\[data-later-quiet\]' src/app/globals.css >/dev/null; then
+    fail "later-rank Apply must not mute the same .apply node as occupied #1"
+  fi
+  if grep -nE 'className="apply"' src/components/board/listing-card.tsx | grep -q apply-later; then
+    fail "later-rank Apply must not stamp-mute the same .apply hop as occupied #1"
+  fi
+  if grep -nE 'data-apply-later-mute|data-later-apply-quiet|data-apply-later-quiet|data-later-apply-outlined|data-apply-later-two' \
+    src/components/board/listing-card.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
+    fail "later-rank Apply must not add a stamp-only mute on the same Apply hop"
+  fi
   grep -q 'apply\[data-apply-later\]' src/app/globals.css \
     || fail "later-rank Apply must stay an outlined hop"
   grep -q 'apply\[data-apply-later\]\[data-apply-later-outlined\]' src/app/globals.css \
@@ -584,6 +610,10 @@ if [[ -f package.json ]]; then
     || fail "rank tests must cover quieter later ranks on an occupied wall"
   grep -q 'later-rank Apply stays outlined' tests/rank.test.ts \
     || fail "rank tests must keep later-rank Apply outlined — filled Apply is #1 only"
+  grep -q 'class="later-apply"' tests/rank.test.ts \
+    || fail "rank tests must stamp later-rank Apply as later-apply anatomy"
+  grep -q 'class="later-apply"' tests/period.test.ts \
+    || fail "period tests must keep closed-week later Apply on later-apply anatomy"
   grep -q 'data-apply-later-outlined' tests/rank.test.ts \
     || fail "rank tests must stamp later-rank Apply as outlined"
   grep -q 'data-apply-later-outlined' tests/period.test.ts \

@@ -785,7 +785,21 @@ a:hover {
   letter-spacing: 0.06em;
 }
 
-.apply[data-apply-later][data-apply-later-outlined] {
+.later-apply {
+  display: inline-block;
+  margin-left: 0;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--fg);
+  background: transparent;
+  color: var(--fg);
+  font-family: var(--mono);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: none;
+}
+
+.later-sheet[data-later-quiet] .later-apply[data-apply-later][data-apply-later-outlined] {
   display: inline-block;
   padding: 0.2rem 0.55rem;
   border: 1px solid var(--fg);
@@ -1046,7 +1060,8 @@ a:hover {
   filter: brightness(1.08);
 }
 
-.apply[data-apply-later][data-apply-later-outlined]:hover {
+.later-apply:hover,
+.later-sheet[data-later-quiet] .later-apply[data-apply-later][data-apply-later-outlined]:hover {
   color: var(--fg);
   background: transparent;
   filter: none;

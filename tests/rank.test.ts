@@ -164,7 +164,9 @@ test("unpaid stays off the hiring wall — No #1 until Polar reports paid", () =
   assert.match(occupied, /data-first-click="apply"/);
   assert.match(occupied, /Staff Backend Engineer/);
   assert.match(laterCard, /data-apply-later-outlined=""/);
+  assert.match(laterCard, /class="later-apply"/);
   assert.doesNotMatch(laterCard, /data-prize-title/);
+  assert.doesNotMatch(laterCard, /class="apply"/);
 
   assert.match(closedUnpaid, /data-empty-closed="true"/);
   assert.match(closedUnpaid, /Bids are closed/);
@@ -537,7 +539,9 @@ test("empty week Claim #1 stays the only first click — identity field does not
   assert.match(occupied, /data-prize-title=""/);
   assert.ok(occupiedPrize >= 0 && occupiedTitle > occupiedPrize && occupiedBid > occupiedTitle);
   assert.match(laterCard, /data-apply-later-outlined=""/);
+  assert.match(laterCard, /class="later-apply"/);
   assert.doesNotMatch(laterCard, /data-prize-title/);
+  assert.doesNotMatch(laterCard, /class="apply"/);
   assert.match(formSource, /autoFocus=\{laneEmpty\}/);
   assert.doesNotMatch(formSource, /name="identity"[\s\S]*autoFocus/);
   const emptyOutbidRule =
@@ -622,7 +626,9 @@ test("empty week Claim #1 is the first click — function pick comes after, not 
   assert.doesNotMatch(occupied, /<select[^>]*name="lane"/);
   assert.match(laterCard, /data-later-quiet=""/);
   assert.match(laterCard, /data-apply-later-outlined=""/);
+  assert.match(laterCard, /class="later-apply"/);
   assert.doesNotMatch(laterCard, /data-prize-title/);
+  assert.doesNotMatch(laterCard, /class="apply"/);
   assert.match(closedEmpty, /wall-rail/);
   assert.match(closedEmpty, /wall-plate/);
   assert.doesNotMatch(closedEmpty, /data-first-click="claim"/);
@@ -873,7 +879,9 @@ test("occupied #1 $bid stays a later fact — title stays the prize", () => {
   assert.doesNotMatch(laterCard, /data-prize-title/);
   assert.match(laterCard, /data-apply-later=""/);
   assert.match(laterCard, /data-apply-later-outlined=""/);
+  assert.match(laterCard, /class="later-apply"/);
   assert.match(laterCard, /href="\/out\/lst_gamma"/);
+  assert.doesNotMatch(laterCard, /class="apply"/);
   assert.match(empty, /data-empty-lane="true"/);
   assert.match(empty, /Claim #1 for/);
   assert.doesNotMatch(empty, /data-later-fact/);
@@ -945,9 +953,11 @@ test("occupied later ranks stay quieter than occupied #1", () => {
   assert.match(laterCard, /data-later-quiet=""/);
   assert.match(laterCard, /data-later-role=""/);
   assert.match(laterCard, /data-apply-later=""/);
+  assert.match(laterCard, /class="later-apply"/);
   assert.match(laterCard, /href="\/out\/lst_gamma"/);
   assert.doesNotMatch(laterCard, /data-prize-title/);
   assert.doesNotMatch(laterCard, /data-apply-live/);
+  assert.doesNotMatch(laterCard, /class="apply"/);
   assert.match(lastCard, /data-later-quiet=""/);
   assert.match(lastCard, /data-later-role=""/);
   assert.match(lastCard, /href="\/out\/lst_beta"/);
@@ -1043,8 +1053,9 @@ test("occupied later-rank titles stay quieter than #1 — prize stays first", ()
   assert.match(laterCard, /class="card later-sheet"/);
   assert.match(laterCard, /data-later-role=""/);
   assert.match(laterCard, /class="later-role"/);
+  assert.match(laterCard, /class="later-apply"/);
   assert.match(laterCard, /Platform Engineer/);
-  assert.doesNotMatch(laterCard, /data-prize-title|<h3|class="title"|class="card job-sheet"/);
+  assert.doesNotMatch(laterCard, /data-prize-title|<h3|class="title"|class="card job-sheet"|class="apply"/);
   assert.match(lastCard, /class="card later-sheet"/);
   assert.match(lastCard, /data-later-role=""/);
   assert.doesNotMatch(lastCard, /data-prize-title|<h3|class="title"/);
@@ -1089,51 +1100,89 @@ test("later-rank Apply stays outlined — filled Apply is #1 only", () => {
       listings: [],
     }),
   );
+  const prizePack = html.indexOf("data-prize-pack");
   const first = html.indexOf('data-listing-id="lst_acme"');
-  const later = html.indexOf('data-listing-id="lst_gamma"');
-  const last = html.indexOf('data-listing-id="lst_beta"');
+  const prize = html.indexOf("data-prize-title");
+  const prizeTitle = html.indexOf("Staff Backend Engineer");
+  const applyHref = html.indexOf('href="/out/lst_acme"');
+  const firstClick = html.indexOf('data-first-click="apply"');
   const applyLive = html.indexOf("data-apply-live");
+  const laterPack = html.indexOf("data-later-pack");
+  const later = html.indexOf('data-listing-id="lst_gamma"');
   const laterHop = html.indexOf("data-apply-later");
   const laterOutlined = html.indexOf("data-apply-later-outlined");
   const laterHref = html.indexOf('href="/out/lst_gamma"');
+  const last = html.indexOf('data-listing-id="lst_beta"');
   const lastHref = html.indexOf('href="/out/lst_beta"');
+  const claim = html.indexOf('id="claim"');
   const identity = html.indexOf('name="identity"');
-  assert.ok(first >= 0 && applyLive > first && later > applyLive);
+  const emptyClaim = empty.indexOf("Claim #1 for");
+  const emptyOutbid = empty.indexOf(">Outbid<");
+  const emptyIdentity = empty.indexOf('name="identity"');
+  const laterApplyRule =
+    cssSource.match(
+      /\.later-sheet\[data-later-quiet\] \.later-apply\[data-apply-later\]\[data-apply-later-outlined\][\s\S]*?\}/,
+    )?.[0] ?? "";
+  const filledApplyRule =
+    cssSource.match(
+      /\.job-sheet\[data-take-apply\] \.sheet-apply\[data-apply-after-identity\][\s\S]*?\.apply\[data-apply-live\]\[data-first-click="apply"\]\[data-apply-after-list-first\]\[data-apply-after-list-two\]\[data-apply-after-list-three\]\[data-apply-after-list-four\]\[data-apply-after-list-five\]\[data-apply-after-list-six\][\s\S]*?\}/,
+    )?.[0] ?? "";
+  assert.ok(prizePack >= 0 && first > prizePack && prize > first);
+  assert.ok(prizeTitle > prize && applyHref > prizeTitle && firstClick > applyHref);
+  assert.ok(applyLive > first && laterPack > applyLive && later > laterPack);
   assert.ok(laterHop > later && laterOutlined > laterHop && laterHref > later);
-  assert.ok(last > later && lastHref > last);
-  assert.ok(identity >= 0);
+  assert.ok(last > later && lastHref > last && claim > last);
+  assert.ok(identity >= 0 && identity > claim);
+  assert.ok(emptyClaim >= 0 && emptyOutbid > emptyClaim && emptyIdentity > emptyOutbid);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /data-apply-later=""/);
   assert.match(html, /data-apply-later-outlined=""/);
+  assert.match(html, /class="later-apply"/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.match(html, /href="\/out\/lst_gamma"/);
   assert.match(html, /href="\/out\/lst_beta"/);
   assert.match(html, /Claim #1 for/);
   assert.match(html, />Outbid</);
   assert.match(html, /name="identity"/);
+  assert.match(html, /data-first-click="apply"/);
   assert.equal((html.match(/data-apply-live=""/g) ?? []).length, 1);
+  assert.equal((html.match(/class="apply"/g) ?? []).length, 1);
+  assert.equal((html.match(/class="later-apply"/g) ?? []).length, 2);
   assert.equal((html.match(/data-apply-later=""/g) ?? []).length, 2);
   assert.equal((html.match(/data-apply-later-outlined=""/g) ?? []).length, 2);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
-  assert.doesNotMatch(html.slice(0, later), /data-apply-later-outlined/);
-  assert.doesNotMatch(html.slice(later), /data-apply-live/);
+  assert.doesNotMatch(html.slice(0, later), /data-apply-later-outlined|class="later-apply"/);
+  assert.doesNotMatch(html.slice(later), /data-apply-live|class="apply"/);
   assert.match(firstCard, /data-apply-live=""/);
+  assert.match(firstCard, /class="apply"/);
   assert.match(firstCard, /href="\/out\/lst_acme"/);
   assert.doesNotMatch(firstCard, /data-apply-later/);
   assert.doesNotMatch(firstCard, /data-apply-later-outlined/);
+  assert.doesNotMatch(firstCard, /class="later-apply"/);
+  assert.match(laterCard, /class="later-apply"/);
   assert.match(laterCard, /data-apply-later=""/);
   assert.match(laterCard, /data-apply-later-outlined=""/);
   assert.match(laterCard, /href="\/out\/lst_gamma"/);
   assert.doesNotMatch(laterCard, /data-apply-live/);
   assert.doesNotMatch(laterCard, /data-take-apply/);
+  assert.doesNotMatch(laterCard, /class="apply"/);
+  assert.match(lastCard, /class="later-apply"/);
   assert.match(lastCard, /data-apply-later-outlined=""/);
   assert.match(lastCard, /href="\/out\/lst_beta"/);
+  assert.doesNotMatch(lastCard, /class="apply"|data-apply-live|data-first-click="apply"/);
   assert.match(empty, /Claim #1 for/);
   assert.match(empty, /name="identity"/);
+  assert.match(empty, /data-first-click="claim"/);
   assert.doesNotMatch(empty, /data-apply-later-outlined/);
   assert.doesNotMatch(empty, /data-apply-later/);
+  assert.doesNotMatch(empty, /class="later-apply"/);
   assert.doesNotMatch(empty, />Apply</);
   assert.doesNotMatch(empty, /href="\/out\//);
+  assert.match(laterApplyRule, /border:\s*1px solid var\(--fg\)/);
+  assert.match(laterApplyRule, /background:\s*transparent/);
+  assert.match(filledApplyRule, /min-height:\s*6\.15rem/);
+  assert.doesNotMatch(cssSource, /data-later-quiet\] \.apply[^-]/);
+  assert.doesNotMatch(html, /data-apply-later-mute|data-later-apply-quiet|data-apply-later-quiet|data-later-apply-outlined|data-apply-later-two/);
 });
 
 test("board chrome has lane tabs, identity field, amount, and Outbid", () => {
@@ -1470,8 +1519,9 @@ test("later live ranks stamp Apply as the certain hop, not a second #1 take", ()
   assert.match(html, /data-later-role=""/);
   assert.match(html, />Apply</);
   assert.match(html, /href="\/out\/lst_gamma"/);
-  assert.match(html, /class="apply"/);
+  assert.match(html, /class="later-apply"/);
   assert.match(html, /class="sheet-apply"/);
+  assert.doesNotMatch(html, /class="apply"/);
   assert.doesNotMatch(html, /data-take-apply/);
   assert.doesNotMatch(html, /data-apply-live/);
   assert.doesNotMatch(html, /data-apply-after-identity/);
@@ -3679,8 +3729,10 @@ test("occupied List a role stays quieter than Apply #1 — title stays the prize
   assert.doesNotMatch(html, /data-apply-after-list-seven/);
   assert.doesNotMatch(html, /data-list-quiet-after|data-apply-one-first|data-list-after-apply-N/);
   assert.match(laterCard, /data-apply-later-outlined=""/);
+  assert.match(laterCard, /class="later-apply"/);
   assert.doesNotMatch(laterCard, /data-first-click="apply"/);
   assert.doesNotMatch(laterCard, /data-prize-title/);
+  assert.doesNotMatch(laterCard, /class="apply"/);
   assert.match(empty, /data-first-click="claim"/);
   assert.match(empty, /Claim #1 for/);
   assert.match(empty, />Outbid</);
