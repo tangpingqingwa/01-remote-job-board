@@ -593,6 +593,11 @@ a:hover {
   font-weight: 600;
 }
 
+.card[data-rank="1"] .bid[data-later-fact] {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .company {
   margin: 0.2rem 0 0;
   color: var(--fg);

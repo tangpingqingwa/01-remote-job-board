@@ -96,7 +96,11 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
           </p>
         ) : null}
         <p className="meta">
-          <span className="bid" data-bid="">
+          <span
+            className="bid"
+            data-bid=""
+            {...(listing.rank === 1 ? { "data-later-fact": "" } : {})}
+          >
             {formatUsd(listing.bidUsd)}
           </span>
           <span className="clicks" data-clicks="">
