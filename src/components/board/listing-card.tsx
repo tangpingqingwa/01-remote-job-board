@@ -15,13 +15,14 @@ type ListingCardProps = {
 };
 
 export function ListingCard({ listing, live = true }: ListingCardProps) {
-  const takeApply = live && listing.rank === 1;
-  const laterApply = live && listing.rank > 1;
-  const laterQuiet = listing.rank > 1;
+  const prize = listing.rank === 1;
+  const takeApply = live && prize;
+  const laterApply = live && !prize;
+  const laterQuiet = !prize;
 
   return (
     <article
-      className="card job-sheet"
+      className={prize ? "card job-sheet" : "card later-sheet"}
       data-listing-card=""
       data-rank={listing.rank}
       data-listing-id={listing.id}
@@ -29,18 +30,22 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
       {...(laterApply ? { "data-later-apply": "" } : {})}
       {...(laterQuiet ? { "data-later-quiet": "" } : {})}
     >
-      <span className="sheet-pin" aria-hidden="true" />
-      <p className="sheet-rankline">
+      {prize ? <span className="sheet-pin" aria-hidden="true" /> : null}
+      <p className={prize ? "sheet-rankline" : "later-rankline"}>
         <span className="rank">#{listing.rank}</span>
+        {prize ? null : (
+          <span className="later-role" data-later-role="">
+            {listing.title}
+          </span>
+        )}
         <span className="remote">Remote (global)</span>
       </p>
       <div className="card-body">
-        <h3
-          className="title"
-          {...(listing.rank === 1 ? { "data-prize-title": "" } : {})}
-        >
-          {listing.title}
-        </h3>
+        {prize ? (
+          <h3 className="title" data-prize-title="">
+            {listing.title}
+          </h3>
+        ) : null}
         <p className="company" data-company="">
           {listing.company}
         </p>

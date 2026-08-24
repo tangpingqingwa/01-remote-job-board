@@ -456,13 +456,27 @@ a:hover {
   color: var(--fg);
 }
 
+.leaderboard-bay {
+  margin: 1.35rem 0 0;
+}
+
 .leaderboard {
   list-style: none;
-  margin: 1.35rem 0 0;
+  margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
   gap: 0.95rem 0.85rem;
+}
+
+.leaderboard-prize {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.leaderboard-later {
+  margin-top: 0.85rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
 }
 
 .empty-lane {
@@ -609,23 +623,63 @@ a:hover {
   letter-spacing: -0.04em;
 }
 
-.job-sheet[data-later-quiet] {
-  min-height: 10.25rem;
-  padding: 0.95rem 0.9rem 0.8rem;
-  box-shadow: 2px 2px 0 rgba(26, 33, 24, 0.04);
+.later-sheet[data-later-quiet] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  min-height: 0;
+  padding: 0.5rem 0.75rem;
+  gap: 0.35rem 0.75rem;
+  box-shadow: none;
+  border-style: dashed;
 }
 
-.job-sheet[data-later-quiet] .sheet-pin {
-  width: 0.45rem;
-  height: 0.45rem;
-  margin-left: -0.225rem;
-  opacity: 0.45;
+.later-sheet[data-later-quiet] .later-rankline {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex: 1 1 16rem;
+  margin: 0;
+  padding: 0;
 }
 
-.job-sheet[data-later-quiet] .title {
-  font-size: 0.95rem;
-  font-weight: 600;
+.later-sheet[data-later-quiet] .later-role {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 500;
   letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.later-sheet[data-later-quiet] .card-body {
+  flex: 1 1 12rem;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+}
+
+.later-sheet[data-later-quiet] .company {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.later-sheet[data-later-quiet] .salary {
+  margin: 0;
+}
+
+.later-sheet[data-later-quiet] .sheet-apply {
+  margin: 0 0 0 auto;
+}
+
+.later-sheet[data-later-quiet] .meta {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  gap: 0.65rem;
 }
 
 .card[data-rank="1"] .meta[data-later-fact] {
@@ -682,8 +736,7 @@ a:hover {
   color: var(--primary);
 }
 
-.job-sheet[data-take-apply] .sheet-apply,
-.job-sheet[data-later-apply] .sheet-apply {
+.job-sheet[data-take-apply] .sheet-apply {
   margin-top: 0.85rem;
 }
 
