@@ -291,6 +291,18 @@ if [[ -f package.json ]]; then
     || fail "rank tests must stamp List a role after Apply is re-concentrated again so it does not disappear"
   grep -q 'data-list-after-apply-five' tests/period.test.ts \
     || fail "period tests must keep closed-week List a role after Apply is re-concentrated again unstamped"
+  grep -q 'data-list-after-apply-six' src/components/board/listing-card.tsx \
+    || fail "occupied List a role must stay certain after Apply is re-concentrated again"
+  grep -q 'data-list-after-apply-six' src/app/globals.css \
+    || fail "List a role after Apply is re-concentrated again must stay a full-width dashed hop"
+  grep -q 'min-height: 4.75rem' src/app/globals.css \
+    || fail "List a role after Apply is re-concentrated again must stay taller than 4.25rem"
+  grep -q 'lists after Apply is re-concentrated again so List a role does not disappear under Apply' tests/rank.test.ts \
+    || fail "rank tests must cover List a role after Apply is re-concentrated again so it does not disappear under Apply"
+  grep -q 'data-list-after-apply-six' tests/rank.test.ts \
+    || fail "rank tests must stamp List a role after Apply is re-concentrated again so it does not disappear under Apply"
+  grep -q 'data-list-after-apply-six' tests/period.test.ts \
+    || fail "period tests must keep closed-week List a role after Apply is re-concentrated again unstamped"
   grep -q 'data-apply-after-list-three' src/components/board/listing-card.tsx \
     || fail "occupied #1 Apply must stay certain after List a role is re-concentrated again"
   grep -q 'data-apply-after-list-three' src/app/globals.css \

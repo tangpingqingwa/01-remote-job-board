@@ -77,6 +77,7 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
               data-list-after-apply-three=""
               data-list-after-apply-four=""
               data-list-after-apply-five=""
+              data-list-after-apply-six=""
             >
               List a role
             </a>{" "}
