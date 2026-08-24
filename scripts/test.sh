@@ -475,8 +475,50 @@ if [[ -f package.json ]]; then
     || fail "later ranks must stamp quieter type/outline/chrome than occupied #1"
   grep -q 'data-later-quiet' src/app/globals.css \
     || fail "later-rank quiet chrome must be visually certain"
-  grep -q 'data-later-quiet] .title' src/app/globals.css \
-    || fail "later-rank titles must stay quieter than the occupied #1 prize"
+  grep -q 'data-later-pack' src/components/board/leaderboard.tsx \
+    || fail "occupied later ranks must group after the #1 prize pack"
+  grep -q 'data-prize-pack' src/components/board/leaderboard.tsx \
+    || fail "occupied #1 must stay in its own prize pack"
+  grep -q 'leaderboard-later' src/components/board/leaderboard.tsx \
+    || fail "later ranks must use a later leaderboard, not the prize grid"
+  grep -q 'leaderboard-later' src/app/globals.css \
+    || fail "later-rank pack must stay visually certain as a roster"
+  grep -q 'later-sheet' src/components/board/listing-card.tsx \
+    || fail "later-rank cards must use later-sheet anatomy, not the #1 job-sheet"
+  grep -q 'later-sheet' src/app/globals.css \
+    || fail "later-sheet roster chrome must be visually certain"
+  grep -q 'data-later-role' src/components/board/listing-card.tsx \
+    || fail "later-rank titles must sit on later-role, not the #1 prize title node"
+  grep -q 'later-sheet\[data-later-quiet\] \.later-role' src/app/globals.css \
+    || fail "later-rank role line must stay quieter than the occupied #1 prize"
+  later_role_rule="$(awk '/\.later-sheet\[data-later-quiet\] \.later-role \{/,/^\}/' src/app/globals.css)"
+  echo "$later_role_rule" | grep -q 'font-size: 0.92rem' \
+    || fail "later-rank titles must read smaller than the occupied #1 prize"
+  if echo "$later_role_rule" | grep -q 'var(--muted)'; then
+    fail "later-rank titles must recede by anatomy, not --muted on the prize title node"
+  fi
+  if echo "$later_role_rule" | grep -q '0.78rem'; then
+    fail "later-rank titles must not stamp-mute the prize title at 0.78rem"
+  fi
+  if grep -nE 'data-later-quiet\] \.title|\.title\[data-later-quiet\]' src/app/globals.css >/dev/null; then
+    fail "later-rank titles must not mute the same .title node as occupied #1"
+  fi
+  if grep -nE 'data-later-title|data-title-later-quiet|data-later-quiet-title|data-later-title-quiet' \
+    src/components/board/listing-card.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
+    fail "later-rank titles must not add a stamp-only mute on the same title node"
+  fi
+  grep -q 'occupied later-rank titles stay quieter than #1' tests/rank.test.ts \
+    || fail "rank tests must cover later-rank titles quieter than the #1 prize"
+  grep -q 'later-rank titles stay quieter than #1' tests/rank.test.ts \
+    || fail "rank tests must cover quieter later-rank titles on an occupied wall"
+  grep -q 'data-later-pack' tests/rank.test.ts \
+    || fail "rank tests must stamp the later-rank pack"
+  grep -q 'data-later-pack' tests/period.test.ts \
+    || fail "period tests must keep empty/closed weeks honest about the later-rank pack"
+  grep -q 'data-later-role' tests/rank.test.ts \
+    || fail "rank tests must stamp later-rank titles as later-role"
+  grep -q 'data-later-role' tests/period.test.ts \
+    || fail "period tests must keep empty/closed weeks honest about later-role titles"
   grep -q 'apply\[data-apply-later\]' src/app/globals.css \
     || fail "later-rank Apply must stay an outlined hop"
   grep -q 'apply\[data-apply-later\]\[data-apply-later-outlined\]' src/app/globals.css \

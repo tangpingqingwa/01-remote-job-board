@@ -73,13 +73,35 @@ export function Leaderboard({
     );
   }
 
+  const prize = listings.find((listing) => listing.rank === 1);
+  const later = listings.filter((listing) => listing.rank > 1);
+
   return (
-    <ol className="leaderboard" data-leaderboard="">
-      {listings.map((listing) => (
-        <li key={listing.id}>
-          <ListingCard listing={listing} live={!closed} />
-        </li>
-      ))}
-    </ol>
+    <div className="leaderboard-bay" data-leaderboard="">
+      {prize ? (
+        <ol
+          className="leaderboard leaderboard-prize"
+          data-prize-pack=""
+          aria-label="This week's #1"
+        >
+          <li key={prize.id}>
+            <ListingCard listing={prize} live={!closed} />
+          </li>
+        </ol>
+      ) : null}
+      {later.length > 0 ? (
+        <ol
+          className="leaderboard leaderboard-later"
+          data-later-pack=""
+          aria-label="Later ranks this week"
+        >
+          {later.map((listing) => (
+            <li key={listing.id}>
+              <ListingCard listing={listing} live={!closed} />
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </div>
   );
 }

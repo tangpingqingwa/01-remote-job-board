@@ -698,6 +698,109 @@ test("occupied later ranks stay quieter than occupied #1", () => {
   assert.doesNotMatch(empty, /data-listing-card/);
 });
 
+test("occupied later-rank titles stay quieter than #1 — prize stays first", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: listings[1]! }),
+  );
+  const lastCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: listings[2]! }),
+  );
+  const firstCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: listings[0]! }),
+  );
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const prizePack = html.indexOf("data-prize-pack");
+  const first = html.indexOf('data-listing-id="lst_acme"');
+  const prize = html.indexOf("data-prize-title");
+  const prizeTitle = html.indexOf("Staff Backend Engineer");
+  const applyHref = html.indexOf('href="/out/lst_acme"');
+  const firstClick = html.indexOf('data-first-click="apply"');
+  const laterPack = html.indexOf("data-later-pack");
+  const later = html.indexOf('data-listing-id="lst_gamma"');
+  const laterRole = html.indexOf("data-later-role");
+  const laterTitle = html.indexOf("Platform Engineer");
+  const laterOutlined = html.indexOf("data-apply-later-outlined");
+  const last = html.indexOf('data-listing-id="lst_beta"');
+  const claim = html.indexOf('id="claim"');
+  const emptyClaim = empty.indexOf("Claim #1 for");
+  const emptyOutbid = empty.indexOf(">Outbid<");
+  const emptyIdentity = empty.indexOf('name="identity"');
+  const laterSheetRule =
+    cssSource.match(/\.later-sheet\[data-later-quiet\][\s\S]*?\}/)?.[0] ?? "";
+  const laterRoleRule =
+    cssSource.match(
+      /\.later-sheet\[data-later-quiet\] \.later-role[\s\S]*?\}/,
+    )?.[0] ?? "";
+  const prizeTitleRule =
+    cssSource.match(
+      /\.card\[data-rank="1"\] \.title\[data-prize-title\][\s\S]*?\}/,
+    )?.[0] ?? "";
+  assert.ok(prizePack >= 0 && first > prizePack && prize > first);
+  assert.ok(prizeTitle > prize && applyHref > prizeTitle && firstClick > applyHref);
+  assert.ok(laterPack > firstClick && later > laterPack && laterRole > later);
+  assert.ok(laterTitle > laterRole && laterOutlined > laterTitle && last > laterOutlined);
+  assert.ok(claim > last);
+  assert.ok(emptyClaim >= 0 && emptyOutbid > emptyClaim && emptyIdentity > emptyOutbid);
+  assert.match(html, /data-prize-pack=""/);
+  assert.match(html, /data-later-pack=""/);
+  assert.match(html, /data-prize-title=""/);
+  assert.match(html, /data-later-role=""/);
+  assert.match(html, /class="card later-sheet"/);
+  assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-later-outlined=""/);
+  assert.match(html, /Claim #1 for/);
+  assert.match(html, />Outbid</);
+  assert.match(html, /name="identity"/);
+  assert.equal((html.match(/data-prize-pack=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-later-pack=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-prize-title=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-later-role=""/g) ?? []).length, 2);
+  assert.equal((html.match(/class="card later-sheet"/g) ?? []).length, 2);
+  assert.equal((html.match(/class="card job-sheet"/g) ?? []).length, 1);
+  assert.doesNotMatch(html.slice(later), /data-prize-title|class="card job-sheet"|class="title"/);
+  assert.doesNotMatch(html.slice(0, laterPack), /data-later-pack|data-later-role|class="card later-sheet"/);
+  assert.match(firstCard, /class="card job-sheet"/);
+  assert.match(firstCard, /data-prize-title=""/);
+  assert.match(firstCard, /<h3 class="title"/);
+  assert.doesNotMatch(firstCard, /data-later-role|class="card later-sheet"|class="later-role"/);
+  assert.match(laterCard, /class="card later-sheet"/);
+  assert.match(laterCard, /data-later-role=""/);
+  assert.match(laterCard, /class="later-role"/);
+  assert.match(laterCard, /Platform Engineer/);
+  assert.doesNotMatch(laterCard, /data-prize-title|<h3|class="title"|class="card job-sheet"/);
+  assert.match(lastCard, /class="card later-sheet"/);
+  assert.match(lastCard, /data-later-role=""/);
+  assert.doesNotMatch(lastCard, /data-prize-title|<h3|class="title"/);
+  assert.match(empty, /Claim #1 for/);
+  assert.match(empty, />Outbid</);
+  assert.match(empty, /data-first-click="claim"/);
+  assert.doesNotMatch(empty, /data-later-pack|data-prize-pack|data-later-role|class="card later-sheet"/);
+  assert.doesNotMatch(empty, /data-first-click="apply"/);
+  assert.match(laterSheetRule, /flex-direction:\s*row/);
+  assert.match(laterSheetRule, /min-height:\s*0/);
+  assert.match(laterSheetRule, /border-style:\s*dashed/);
+  assert.match(laterRoleRule, /font-size:\s*0\.92rem/);
+  assert.match(prizeTitleRule, /clamp\(1\.55rem/);
+  assert.doesNotMatch(cssSource, /data-later-quiet\] \.title/);
+  assert.doesNotMatch(html, /data-later-title|data-title-later-quiet|data-later-quiet-title/);
+});
+
 test("later-rank Apply stays outlined — filled Apply is #1 only", () => {
   const listings = rankListings(specTieRows);
   const html = renderToStaticMarkup(
