@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { FunctionLane } from "../../lib/types";
-import { MAX_BID_USD, MIN_BID_USD } from "../../lib/types";
+import { FUNCTION_LANES, MAX_BID_USD, MIN_BID_USD } from "../../lib/types";
 
 type BidFormProps = {
   lane: FunctionLane;
@@ -14,6 +14,12 @@ type BidFormProps = {
 function clampAmount(value: number): number {
   if (!Number.isFinite(value)) return MIN_BID_USD;
   return Math.min(MAX_BID_USD, Math.max(MIN_BID_USD, Math.trunc(value)));
+}
+
+function functionLaneName(lane: FunctionLane): string {
+  return lane === "devrel"
+    ? "DevRel"
+    : lane.charAt(0).toUpperCase() + lane.slice(1);
 }
 
 export function BidForm({
@@ -42,7 +48,7 @@ export function BidForm({
         data-bid-form=""
         data-lane={lane}
       >
-        <input type="hidden" name="lane" value={lane} />
+        {laneEmpty ? null : <input type="hidden" name="lane" value={lane} />}
         {listRole ? (
           <p className="list-this-role" data-list-role-stamp="">
             List a role
@@ -87,8 +93,8 @@ export function BidForm({
         <p className="claim-note">
           {laneEmpty ? (
             <>
-              This week&apos;s {laneName} lane is empty. ${MIN_BID_USD} takes
-              #1. Nobody is invented here.
+              This week is empty. ${MIN_BID_USD} takes #1. Pick the function
+              after Claim #1. Nobody is invented here.
             </>
           ) : (
             <>
@@ -131,7 +137,24 @@ export function BidForm({
             </button>
           )}
         </div>
-        {laneEmpty ? null : (
+        {laneEmpty ? (
+          <nav
+            className="lane-pick"
+            aria-label="Function lanes"
+            data-lane-tabs=""
+          >
+            <label className="lane-pick-label" htmlFor="lane-pick">
+              Function lanes
+            </label>
+            <select id="lane-pick" name="lane" defaultValue={lane}>
+              {FUNCTION_LANES.map((item) => (
+                <option key={item} value={item} data-lane={item}>
+                  {functionLaneName(item)}
+                </option>
+              ))}
+            </select>
+          </nav>
+        ) : (
           <p className="raise-hint">
             Already on this lane? Enter the same apply URL or handle and raise.
           </p>

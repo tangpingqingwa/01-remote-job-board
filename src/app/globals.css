@@ -124,6 +124,10 @@ a:hover {
   align-items: start;
 }
 
+.hiring-wall:not(:has(.wall-rail)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .wall-rail {
   position: sticky;
   top: 0.75rem;
@@ -377,6 +381,35 @@ a:hover {
 .claim[data-empty-bay-list] .bid-row input[name="identity"]:focus {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+.claim[data-empty-bay-list] .lane-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+}
+
+.claim[data-empty-bay-list] .lane-pick-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.claim[data-empty-bay-list] .lane-pick select {
+  width: 100%;
+  max-width: 16rem;
+  min-height: 2.35rem;
+  padding: 0 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: #fffdf6;
+  color: var(--fg);
+  font: inherit;
 }
 
 .claim[data-empty-honest] h2[data-empty-claim] {

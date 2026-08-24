@@ -174,6 +174,28 @@ if [[ -f package.json ]]; then
     src/components/board/bid-form.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "empty Claim #1 first-click must not add a second named hop"
   fi
+  grep -q 'emptyFirst ? null' src/components/board/board.tsx \
+    || fail "live empty week must not hang eight Function-lane plates in the wall rail"
+  grep -q 'hiring-wall:not(:has(.wall-rail))' src/app/globals.css \
+    || fail "live empty week must drop the eight-plate rail column"
+  grep -q 'name="lane"' src/components/board/bid-form.tsx \
+    || fail "empty week must pick the function after Claim #1"
+  grep -q '<select' src/components/board/bid-form.tsx \
+    || fail "empty week function pick must be one control after Claim #1, not eight plates"
+  grep -q 'empty week Claim #1 is the first click' tests/rank.test.ts \
+    || fail "rank tests must cover empty-week Claim #1 before the function pick"
+  grep -q 'function pick comes after, not eight equal plates' tests/rank.test.ts \
+    || fail "rank tests must keep empty-week function pick off eight equal plates"
+  grep -q 'hiring-wall:not(:has(.wall-rail))' tests/rank.test.ts \
+    || fail "rank tests must cover the empty-week one-column first click"
+  grep -q 'wall-plate' tests/rank.test.ts \
+    || fail "rank tests must keep empty week off eight equal wall plates"
+  grep -q 'wall-rail' tests/period.test.ts \
+    || fail "period tests must keep closed weeks on the occupied wall rail"
+  if grep -nE 'data-empty-lane-pick|data-lane-after-claim|data-empty-function-pick|hiring-wall-empty-first' \
+    src/components/board/bid-form.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "empty week function pick must not add another named hop"
+  fi
   grep -q 'List a role' src/components/board/bid-form.tsx \
     || fail "empty Claim #1 cut must keep occupied List a role"
   grep -q 'data-prize-title' src/components/board/listing-card.tsx \
