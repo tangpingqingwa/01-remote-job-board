@@ -647,6 +647,19 @@ a:hover {
   box-shadow: 9px 9px 0 rgba(26, 33, 24, 0.4);
 }
 
+.job-sheet[data-take-apply] .sheet-apply[data-apply-after-identity]
+  .apply[data-apply-live][data-first-click="apply"][data-apply-after-list-first][data-apply-after-list-two][data-apply-after-list-three][data-apply-after-list-four][data-apply-after-list-five] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 5.65rem;
+  padding: 1.45rem 2.35rem;
+  font-size: 1.6rem;
+  letter-spacing: 0.2em;
+  box-shadow: 10px 10px 0 rgba(26, 33, 24, 0.44);
+}
+
 .job-sheet[data-take-apply] .list-after-apply-wrap {
   margin: 0.55rem 0 0;
   color: var(--muted);
