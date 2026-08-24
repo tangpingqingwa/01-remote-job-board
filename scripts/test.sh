@@ -375,6 +375,24 @@ if [[ -f package.json ]]; then
     || fail "rank tests must stamp the occupied #1 prize title"
   grep -q 'data-prize-title' tests/period.test.ts \
     || fail "period tests must keep empty/closed weeks honest about the prize title"
+  grep -q 'data-later-quiet' src/components/board/listing-card.tsx \
+    || fail "later ranks must stamp quieter type/outline/chrome than occupied #1"
+  grep -q 'data-later-quiet' src/app/globals.css \
+    || fail "later-rank quiet chrome must be visually certain"
+  grep -q 'data-later-quiet] .title' src/app/globals.css \
+    || fail "later-rank titles must stay quieter than the occupied #1 prize"
+  grep -q 'apply\[data-apply-later\]' src/app/globals.css \
+    || fail "later-rank Apply must stay an outlined hop"
+  grep -q 'border: 1px solid var(--fg)' src/app/globals.css \
+    || fail "later-rank Apply must stay an outline, not a filled #1 hop"
+  grep -q 'background: transparent' src/app/globals.css \
+    || fail "later-rank Apply must stay outlined, not filled like occupied #1"
+  grep -q 'later ranks stay quieter than occupied #1' tests/rank.test.ts \
+    || fail "rank tests must cover quieter later ranks on an occupied wall"
+  grep -q 'data-later-quiet' tests/rank.test.ts \
+    || fail "rank tests must stamp quieter later ranks"
+  grep -q 'data-later-quiet' tests/period.test.ts \
+    || fail "period tests must keep empty/closed weeks honest about later-rank quiet"
   grep -q 'hiring wall' tests/rank.test.ts \
     || fail "rank tests must cover the hiring-wall layout"
   if grep -nE 'top company|featured employer|star rating' \

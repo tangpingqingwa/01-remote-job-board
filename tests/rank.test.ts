@@ -368,10 +368,75 @@ test("occupied #1 role title is the prize before $bid + clicks", () => {
   assert.doesNotMatch(laterCard, /data-prize-title/);
   assert.match(laterCard, /data-rank="2"/);
   assert.match(laterCard, /data-apply-later=""/);
+  assert.match(laterCard, /data-later-quiet=""/);
   assert.match(laterCard, /Platform Engineer/);
   assert.match(empty, /data-empty-lane="true"/);
   assert.match(empty, /data-empty-bay-list=""/);
   assert.doesNotMatch(empty, /data-prize-title/);
+  assert.doesNotMatch(empty, /data-later-quiet/);
+  assert.doesNotMatch(empty, /data-listing-card/);
+});
+
+test("occupied later ranks stay quieter than occupied #1", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: listings[1]! }),
+  );
+  const lastCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: listings[2]! }),
+  );
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const first = html.indexOf('data-listing-id="lst_acme"');
+  const later = html.indexOf('data-listing-id="lst_gamma"');
+  const last = html.indexOf('data-listing-id="lst_beta"');
+  const prize = html.indexOf("data-prize-title");
+  const laterQuiet = html.indexOf("data-later-quiet");
+  const lastQuiet = html.lastIndexOf("data-later-quiet");
+  const laterApply = html.indexOf("data-apply-later");
+  const laterHref = html.indexOf('href="/out/lst_gamma"');
+  const lastHref = html.indexOf('href="/out/lst_beta"');
+  assert.ok(first >= 0 && prize > first && later > prize);
+  assert.ok(laterQuiet > later && last > later && lastQuiet > last);
+  assert.ok(laterHref > laterQuiet && laterApply > laterHref);
+  assert.ok(lastHref > last);
+  assert.match(html, /data-prize-title=""/);
+  assert.match(html, /data-later-quiet=""/);
+  assert.match(html, /data-apply-later=""/);
+  assert.match(html, /href="\/out\/lst_gamma"/);
+  assert.match(html, /href="\/out\/lst_beta"/);
+  assert.match(html, /Claim #1 for/);
+  assert.match(html, />Outbid</);
+  assert.match(html, /name="identity"/);
+  assert.equal((html.match(/data-prize-title=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-later-quiet=""/g) ?? []).length, 2);
+  assert.equal((html.match(/data-apply-later=""/g) ?? []).length, 2);
+  assert.doesNotMatch(html.slice(0, later), /data-later-quiet/);
+  assert.doesNotMatch(html.slice(later), /data-prize-title/);
+  assert.match(laterCard, /data-later-quiet=""/);
+  assert.match(laterCard, /data-apply-later=""/);
+  assert.match(laterCard, /href="\/out\/lst_gamma"/);
+  assert.doesNotMatch(laterCard, /data-prize-title/);
+  assert.doesNotMatch(laterCard, /data-apply-live/);
+  assert.match(lastCard, /data-later-quiet=""/);
+  assert.match(lastCard, /href="\/out\/lst_beta"/);
+  assert.match(empty, /data-empty-lane="true"/);
+  assert.match(empty, /data-empty-quiet="true"/);
+  assert.doesNotMatch(empty, /data-later-quiet/);
   assert.doesNotMatch(empty, /data-listing-card/);
 });
 
@@ -651,6 +716,7 @@ test("later live ranks stamp Apply as the certain hop, not a second #1 take", ()
   assert.match(html, /data-rank="2"/);
   assert.match(html, /data-later-apply=""/);
   assert.match(html, /data-apply-later=""/);
+  assert.match(html, /data-later-quiet=""/);
   assert.match(html, />Apply</);
   assert.match(html, /href="\/out\/lst_gamma"/);
   assert.match(html, /class="apply"/);
