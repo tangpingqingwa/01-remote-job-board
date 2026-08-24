@@ -350,6 +350,14 @@ a:hover {
   outline-offset: 2px;
 }
 
+.claim[data-empty-honest] h2[data-empty-claim] {
+  font-size: clamp(1.7rem, 3.8vw, 2.35rem);
+}
+
+.claim[data-empty-honest] .claim-note {
+  color: var(--fg);
+}
+
 .outbid {
   height: 2.75rem;
   padding: 0 1.4rem;
@@ -436,6 +444,19 @@ a:hover {
   color: var(--primary);
   font-weight: 600;
   border-bottom: 1px solid var(--primary);
+}
+
+.empty-lane[data-empty-honest] {
+  pointer-events: none;
+}
+
+.empty-lane[data-empty-closed][data-empty-honest] {
+  pointer-events: auto;
+}
+
+.empty-lane[data-empty-honest] .empty-lane-kicker,
+.empty-lane[data-empty-closed][data-empty-honest] p {
+  color: var(--fg);
 }
 
 .card,

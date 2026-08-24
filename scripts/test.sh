@@ -143,6 +143,20 @@ if [[ -f package.json ]]; then
     || fail "period tests must keep closed weeks unstamped for listing"
   grep -q 'data-empty-identity-first' tests/period.test.ts \
     || fail "period tests must keep closed weeks unstamped for identity-first"
+  grep -q 'data-empty-honest' src/components/board/bid-form.tsx \
+    || fail "live empty claim must stamp honesty"
+  grep -q 'data-empty-claim' src/components/board/bid-form.tsx \
+    || fail "live empty claim must stamp Claim #1 as the honest lead"
+  grep -q 'data-empty-honest' src/components/board/leaderboard.tsx \
+    || fail "empty and closed-empty weeks must stamp honesty"
+  grep -q 'data-empty-honest' src/app/globals.css \
+    || fail "empty-honest chrome must be visually certain"
+  grep -q 'empty and closed-empty weeks stay honest' tests/rank.test.ts \
+    || fail "rank tests must cover empty-week honesty"
+  grep -q 'data-empty-honest' tests/rank.test.ts \
+    || fail "rank tests must stamp empty-week honesty"
+  grep -q 'data-empty-honest' tests/period.test.ts \
+    || fail "period tests must stamp closed-empty honesty"
   grep -q 'data-hiring-wall' src/components/board/board.tsx \
     || fail "board must be a hiring wall, not a generic directory"
   grep -q 'Function lanes' src/components/board/board.tsx \

@@ -23,6 +23,7 @@ export function Leaderboard({
           className="empty-lane empty-lane-quiet"
           data-empty-lane="true"
           data-empty-quiet="true"
+          data-empty-honest=""
         >
           <p className="sr-only">
             No listings this period in {laneLabel(lane)}. Rank is the bid. This
@@ -39,6 +40,7 @@ export function Leaderboard({
           className="empty-lane"
           data-empty-lane="true"
           data-empty-closed="true"
+          data-empty-honest=""
         >
           <p className="empty-lane-kicker">Closed week</p>
           <p>
