@@ -117,16 +117,24 @@ export function BidForm({
             </>
           )}
         </p>
-        <div className="bid-row">
+        <div
+          className="bid-row"
+          {...(listRole ? { "data-one-identity": "" } : {})}
+        >
           {laneEmpty ? null : (
-            <input
-              id="identity"
-              name="identity"
-              placeholder="Apply URL or company handle"
-              autoComplete="off"
-              spellCheck={false}
-              required
-            />
+            <>
+              <label className="identity-label" htmlFor="identity">
+                Apply URL or company handle
+              </label>
+              <input
+                id="identity"
+                name="identity"
+                placeholder="Apply URL or company handle"
+                autoComplete="off"
+                spellCheck={false}
+                required
+              />
+            </>
           )}
           <button type="submit" className="outbid">
             Outbid
