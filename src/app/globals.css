@@ -225,6 +225,15 @@ a:hover {
   background: var(--sheet);
 }
 
+.claim[data-list-role] {
+  margin-top: 1.5rem;
+  padding: 0.75rem 0.9rem 0.85rem;
+  border-width: 1px;
+  border-style: dashed;
+  border-color: var(--line);
+  background: color-mix(in oklab, var(--sheet) 88%, var(--bg));
+}
+
 .list-this-role {
   display: inline-flex;
   align-items: center;
@@ -239,6 +248,16 @@ a:hover {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.claim[data-list-role] .list-this-role {
+  min-height: 1.45rem;
+  margin-bottom: 0.4rem;
+  padding: 0 0.55rem;
+  border-width: 1px;
+  color: var(--muted);
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
 }
 
 .claim h2 {
@@ -368,24 +387,40 @@ a:hover {
   color: var(--fg);
 }
 
+.claim[data-list-role] h2 {
+  font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+  color: var(--muted);
+}
+
+.claim[data-list-role] .claim-note {
+  font-size: 0.82rem;
+}
+
 .claim[data-list-role] .bid-row[data-one-identity] {
   align-items: stretch;
 }
 
 .claim[data-list-role] .bid-row[data-one-identity] .identity-label {
   flex: 1 1 100%;
-  font-size: 0.95rem;
-  letter-spacing: -0.02em;
-  text-transform: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
   line-height: 1.2;
 }
 
 .claim[data-list-role] .bid-row[data-one-identity] input[name="identity"] {
   flex: 1 1 16rem;
-  min-height: 3rem;
-  border: 2px solid var(--fg);
-  background: #fff;
-  font-weight: 600;
+  min-height: 2.55rem;
+  border: 1px solid var(--line);
+  background: #fffdf6;
+  font-weight: 400;
+}
+
+.claim[data-list-role] .outbid {
+  height: 2.35rem;
+  padding: 0 1.05rem;
+  font-size: 0.92rem;
 }
 
 .claim[data-list-role] .bid-row[data-one-identity] input[name="identity"]:focus {
@@ -778,7 +813,7 @@ a:hover {
 .job-sheet[data-take-apply] .list-after-apply-wrap {
   margin: 0.55rem 0 0;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   line-height: 1.4;
 }
 
@@ -899,20 +934,25 @@ a:hover {
 }
 
 .list-after-apply[data-list-after-apply][data-list-after-apply-first][data-list-after-apply-two][data-list-after-apply-three][data-list-after-apply-four][data-list-after-apply-five][data-list-after-apply-six][data-list-after-apply-seven] {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-width: 19.5rem;
-  min-height: 5.25rem;
-  padding: 0 2.4rem;
-  font-size: 1.32rem;
-  letter-spacing: 0.2em;
+  display: inline;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  text-decoration: underline dashed;
+  text-underline-offset: 0.18em;
+  vertical-align: baseline;
 }
 
 .list-after-apply[data-list-after-apply][data-list-after-apply-first][data-list-after-apply-two][data-list-after-apply-three][data-list-after-apply-four][data-list-after-apply-five][data-list-after-apply-six][data-list-after-apply-seven]:hover {
   color: var(--fg);
-  background: color-mix(in oklab, var(--fg) 8%, var(--sheet));
+  background: none;
 }
 
 .apply[data-apply-live]:hover {

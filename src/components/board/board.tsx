@@ -22,6 +22,15 @@ export function Board({
 }: BoardProps) {
   const topBid = listings[0]?.bidUsd ?? 0;
   const defaultAmount = topBid > 0 ? topBid + 1 : MIN_BID_USD;
+  const laneEmpty = listings.length === 0;
+  const claimForm = live ? (
+    <BidForm
+      lane={lane}
+      laneName={laneLabel(lane)}
+      defaultAmount={defaultAmount}
+      laneEmpty={laneEmpty}
+    />
+  ) : null;
 
   return (
     <main
@@ -47,20 +56,14 @@ export function Board({
             bid.
           </p>
         </header>
-        {live ? (
-          <BidForm
-            lane={lane}
-            laneName={laneLabel(lane)}
-            defaultAmount={defaultAmount}
-            laneEmpty={listings.length === 0}
-          />
-        ) : null}
+        {laneEmpty ? claimForm : null}
         <Leaderboard
           lane={lane}
           listings={listings}
           hideEmptyChrome={live}
           closed={!live}
         />
+        {laneEmpty ? null : claimForm}
       </div>
     </main>
   );

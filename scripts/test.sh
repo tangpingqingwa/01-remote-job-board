@@ -371,8 +371,6 @@ if [[ -f package.json ]]; then
     || fail "occupied List a role must stay certain after Apply is re-concentrated again"
   grep -q 'data-list-after-apply-seven' src/app/globals.css \
     || fail "List a role after Apply is re-concentrated again must stay a full-width dashed hop"
-  grep -q 'min-height: 5.25rem' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated again must stay taller than 4.75rem"
   grep -q 'lists after Apply is re-concentrated again so List a role does not disappear under that louder Apply' tests/rank.test.ts \
     || fail "rank tests must cover List a role after Apply is re-concentrated again so it does not disappear under that louder Apply"
   grep -q 'data-list-after-apply-seven' tests/rank.test.ts \
@@ -425,6 +423,26 @@ if [[ -f package.json ]]; then
     || fail "rank tests must stamp Apply after List a role is re-concentrated again so Apply does not disappear under List"
   grep -q 'data-apply-after-list-six' tests/period.test.ts \
     || fail "period tests must keep closed-week Apply after List a role is re-concentrated again unstamped"
+  grep -q 'laneEmpty ? claimForm : null' src/components/board/board.tsx \
+    || fail "empty week must keep Claim #1 above the empty bay"
+  grep -q 'laneEmpty ? null : claimForm' src/components/board/board.tsx \
+    || fail "occupied wall must put List a role after the prize sheets"
+  grep -q 'claim\[data-list-role\]' src/app/globals.css \
+    || fail "occupied List a role claim must stay visually quieter than Apply #1"
+  list_hop_rule="$(awk '/\.list-after-apply\[data-list-after-apply\]\[data-list-after-apply-first\]\[data-list-after-apply-two\]\[data-list-after-apply-three\]\[data-list-after-apply-four\]\[data-list-after-apply-five\]\[data-list-after-apply-six\]\[data-list-after-apply-seven\] \{/,/^\}/' src/app/globals.css)"
+  echo "$list_hop_rule" | grep -q 'display: inline' \
+    || fail "occupied List a role hop must stay inline quieter than filled Apply"
+  echo "$list_hop_rule" | grep -q 'min-height: 0' \
+    || fail "occupied List a role hop must not stay a 5.25rem first click"
+  if echo "$list_hop_rule" | grep -q 'min-height: 5.25rem'; then
+    fail "occupied List a role hop must not stay taller than Apply as a first click"
+  fi
+  grep -q 'occupied List a role stays quieter than Apply #1' tests/rank.test.ts \
+    || fail "rank tests must cover occupied List a role quieter than Apply #1"
+  if grep -nE 'data-list-after-apply-eight|data-apply-after-list-seven|data-list-quiet-after|data-apply-one-first' \
+    src/components/board/listing-card.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "occupied List a role quieter than Apply must not add a second named hop"
+  fi
   grep -q 'data-salary' src/components/board/listing-card.tsx \
     || fail "job card must render optional salary as a fact"
   grep -q 'data-prize-title' src/components/board/listing-card.tsx \
