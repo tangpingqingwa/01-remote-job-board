@@ -134,6 +134,7 @@ test("live empty bay yields the claim box as the only action", () => {
   assert.doesNotMatch(html, /data-first-click="apply"/);
   assert.doesNotMatch(html, /data-apply-after-list-first/);
   assert.doesNotMatch(html, /data-apply-after-list-two/);
+  assert.doesNotMatch(html, /data-apply-after-list-three/);
 });
 
 test("live empty bay stamps identity as the certain write", () => {
@@ -182,6 +183,7 @@ test("live empty bay stamps identity as the certain write", () => {
   assert.doesNotMatch(html, /data-first-click="apply"/);
   assert.doesNotMatch(html, /data-apply-after-list-first/);
   assert.doesNotMatch(html, /data-apply-after-list-two/);
+  assert.doesNotMatch(html, /data-apply-after-list-three/);
   assert.doesNotMatch(html, /star rating|chat|discord/i);
 });
 
@@ -237,6 +239,7 @@ test("cards render rank, title, company, $bid, and click count", () => {
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /data-list-after-apply=""/);
   assert.match(html, /data-list-after-apply-first=""/);
   assert.match(html, /data-list-after-apply-two=""/);
@@ -258,6 +261,7 @@ test("job sheet scans as a job: title, company, Apply, then $bid", () => {
   const firstClick = html.indexOf('data-first-click="apply"');
   const afterListFirst = html.indexOf("data-apply-after-list-first");
   const afterListTwo = html.indexOf("data-apply-after-list-two");
+  const afterListThree = html.indexOf("data-apply-after-list-three");
   const listAfter = html.indexOf("data-list-after-apply");
   const listFirst = html.indexOf("data-list-after-apply-first");
   const listTwo = html.indexOf("data-list-after-apply-two");
@@ -267,6 +271,7 @@ test("job sheet scans as a job: title, company, Apply, then $bid", () => {
   assert.ok(firstClick > company && firstClick < apply);
   assert.ok(afterListFirst > firstClick && afterListFirst < apply);
   assert.ok(afterListTwo > afterListFirst && afterListTwo < apply);
+  assert.ok(afterListThree > afterListTwo && afterListThree < apply);
   assert.ok(
     listAfter > apply &&
       listFirst >= listAfter &&
@@ -399,6 +404,7 @@ test("occupied live claim stamps List a role so an employer can find the write",
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.equal((html.match(/data-list-role="employer"/g) ?? []).length, 1);
   assert.equal((html.match(/List a role/g) ?? []).length, 3);
@@ -431,6 +437,7 @@ test("occupied live sheet stamps Apply as the certain outbound hop", () => {
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /\$21/);
   assert.match(html, /Claim #1 for/);
   assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
@@ -438,9 +445,10 @@ test("occupied live sheet stamps Apply as the certain outbound hop", () => {
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
   assert.doesNotMatch(
     html.slice(later),
-    /data-take-apply|data-apply-live|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two/,
+    /data-take-apply|data-apply-live|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three/,
   );
 });
 
@@ -462,6 +470,7 @@ test("occupied #1 Apply stays the certain hop after empty-bay identity leads", (
   const firstClick = html.indexOf('data-first-click="apply"');
   const afterListFirst = html.indexOf("data-apply-after-list-first");
   const afterListTwo = html.indexOf("data-apply-after-list-two");
+  const afterListThree = html.indexOf("data-apply-after-list-three");
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf("data-list-after-apply");
   const listFirst = html.indexOf("data-list-after-apply-first");
@@ -474,7 +483,7 @@ test("occupied #1 Apply stays the certain hop after empty-bay identity leads", (
   assert.ok(take > occupiedIdentity && afterIdentity > take);
   assert.ok(applyLive > afterIdentity && firstClick > applyLive);
   assert.ok(afterListFirst > firstClick && afterListTwo > afterListFirst);
-  assert.ok(apply > afterListTwo && bid > apply);
+  assert.ok(afterListThree > afterListTwo && apply > afterListThree && bid > apply);
   assert.ok(
     listAfter > apply &&
       listFirst >= listAfter &&
@@ -489,6 +498,7 @@ test("occupied #1 Apply stays the certain hop after empty-bay identity leads", (
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.match(html, />Apply</);
   assert.match(html, /data-list-role="employer"/);
@@ -498,12 +508,13 @@ test("occupied #1 Apply stays the certain hop after empty-bay identity leads", (
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(html, /data-empty-identity-first/);
   assert.doesNotMatch(html, /identity-label/);
   assert.doesNotMatch(
     html.slice(later),
-    /data-apply-after-identity|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two/,
+    /data-apply-after-identity|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three/,
   );
 });
 
@@ -531,6 +542,7 @@ test("later live ranks stamp Apply as the certain hop, not a second #1 take", ()
   assert.doesNotMatch(html, /data-first-click="apply"/);
   assert.doesNotMatch(html, /data-apply-after-list-first/);
   assert.doesNotMatch(html, /data-apply-after-list-two/);
+  assert.doesNotMatch(html, /data-apply-after-list-three/);
   assert.doesNotMatch(html, /data-list-after-apply/);
   assert.doesNotMatch(html, /data-list-after-apply-first/);
   assert.doesNotMatch(html, /data-list-after-apply-two/);
@@ -581,7 +593,7 @@ test("occupied live later ranks stamp Apply so an applicant can take the hop", (
   assert.doesNotMatch(html.slice(0, later), /data-later-apply|data-apply-later/);
   assert.doesNotMatch(
     html.slice(later),
-    /data-take-apply|data-apply-live|data-apply-after-identity|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two|data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three/,
+    /data-take-apply|data-apply-live|data-apply-after-identity|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three|data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three/,
   );
 });
 
@@ -601,6 +613,7 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   const firstClick = html.indexOf('data-first-click="apply"');
   const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const afterListTwo = html.indexOf('data-apply-after-list-two=""');
+  const afterListThree = html.indexOf('data-apply-after-list-three=""');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
   const listFirst = html.indexOf('data-list-after-apply-first=""');
@@ -614,7 +627,8 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   const listRole = html.indexOf('data-list-role="employer"');
   assert.ok(take >= 0 && afterIdentity > take && applyLive > afterIdentity);
   assert.ok(firstClick > applyLive && afterListFirst > firstClick);
-  assert.ok(afterListTwo > afterListFirst && apply > afterListTwo && listAfter > apply);
+  assert.ok(afterListTwo > afterListFirst && afterListThree > afterListTwo);
+  assert.ok(apply > afterListThree && listAfter > apply);
   assert.ok(listFirst >= listAfter && listTwo >= listFirst && listThree >= listTwo);
   assert.ok(hopHref > apply && hopHref < bid && listAfter < bid);
   assert.ok(afterCopy > listThree && bid > afterCopy && later > bid);
@@ -633,6 +647,7 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.match(html, /data-list-role="employer"/);
   assert.match(html, /data-later-apply=""/);
@@ -645,6 +660,7 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
@@ -652,7 +668,7 @@ test("occupied live #1 lists after Apply so a closer can find the write", () => 
   assert.doesNotMatch(html, /data-empty-identity-first/);
   assert.doesNotMatch(
     html.slice(later),
-    /data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two/,
+    /data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three/,
   );
 });
 
@@ -672,6 +688,7 @@ test("occupied live #1 Apply wins the first click after List a role", () => {
   const firstClick = html.indexOf('data-first-click="apply"');
   const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const afterListTwo = html.indexOf('data-apply-after-list-two=""');
+  const afterListThree = html.indexOf('data-apply-after-list-three=""');
   const applyHref = html.indexOf('href="/out/lst_acme"');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
@@ -697,8 +714,9 @@ test("occupied live #1 Apply wins the first click after List a role", () => {
   assert.ok(firstClick > applyLive && firstClick < listAfter);
   assert.ok(afterListFirst > firstClick && afterListFirst < listAfter);
   assert.ok(afterListTwo > afterListFirst && afterListTwo < listAfter);
+  assert.ok(afterListThree > afterListTwo && afterListThree < listAfter);
   assert.ok(applyHref >= 0 && applyHref < firstClick);
-  assert.ok(apply > afterListTwo && listAfter > apply);
+  assert.ok(apply > afterListThree && listAfter > apply);
   assert.ok(listFirst >= listAfter && listTwo >= listFirst && listThree >= listTwo);
   assert.ok(hopHref > apply && hopHref < bid && listAfter < bid);
   assert.ok(afterCopy > listThree && bid > afterCopy && later > bid);
@@ -707,6 +725,7 @@ test("occupied live #1 Apply wins the first click after List a role", () => {
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /data-apply-after-identity=""/);
   assert.match(html, /data-list-after-apply=""/);
@@ -723,6 +742,7 @@ test("occupied live #1 Apply wins the first click after List a role", () => {
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-list-after-apply=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-list-after-apply-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-list-after-apply-two=""/g) ?? []).length, 1);
@@ -734,13 +754,14 @@ test("occupied live #1 Apply wins the first click after List a role", () => {
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(
     html.slice(later),
-    /data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two|data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply/,
+    /data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three|data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply/,
   );
   assert.match(empty, /data-empty-bay-list=""/);
   assert.match(empty, /data-empty-identity-first=""/);
   assert.doesNotMatch(empty, /data-first-click="apply"/);
   assert.doesNotMatch(empty, /data-apply-after-list-first/);
   assert.doesNotMatch(empty, /data-apply-after-list-two/);
+  assert.doesNotMatch(empty, /data-apply-after-list-three/);
   assert.doesNotMatch(empty, /data-list-after-apply/);
   assert.doesNotMatch(empty, /data-list-after-apply-first/);
   assert.doesNotMatch(empty, /data-list-after-apply-two/);
@@ -761,6 +782,7 @@ test("occupied List a role stays certain after Apply wins the first click", () =
   const firstClick = html.indexOf('data-first-click="apply"');
   const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const afterListTwo = html.indexOf('data-apply-after-list-two=""');
+  const afterListThree = html.indexOf('data-apply-after-list-three=""');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
   const listFirst = html.indexOf('data-list-after-apply-first=""');
@@ -785,7 +807,7 @@ test("occupied List a role stays certain after Apply wins the first click", () =
     createElement(ListingCard, { listing: listings[1]! }),
   );
   assert.ok(firstClick >= 0 && afterListFirst > firstClick && afterListTwo > afterListFirst);
-  assert.ok(apply > afterListTwo);
+  assert.ok(afterListThree > afterListTwo && apply > afterListThree);
   assert.ok(listAfter > apply);
   assert.ok(hopHref > apply && hopHref < bid && listAfter < bid);
   assert.ok(listFirst >= listAfter && listTwo >= listFirst && listThree >= listTwo);
@@ -803,6 +825,7 @@ test("occupied List a role stays certain after Apply wins the first click", () =
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /href="\/out\/lst_acme"/);
   assert.match(html, /data-list-role="employer"/);
@@ -815,10 +838,11 @@ test("occupied List a role stays certain after Apply wins the first click", () =
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(
     html.slice(later),
-    /data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two/,
+    /data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three/,
   );
   assert.doesNotMatch(laterCard, /data-list-after-apply-first/);
   assert.doesNotMatch(laterCard, /data-list-after-apply-two/);
@@ -827,6 +851,7 @@ test("occupied List a role stays certain after Apply wins the first click", () =
   assert.doesNotMatch(laterCard, /data-first-click="apply"/);
   assert.doesNotMatch(laterCard, /data-apply-after-list-first/);
   assert.doesNotMatch(laterCard, /data-apply-after-list-two/);
+  assert.doesNotMatch(laterCard, /data-apply-after-list-three/);
   assert.match(empty, /data-empty-bay-list=""/);
   assert.match(empty, /data-empty-identity-first=""/);
   assert.doesNotMatch(empty, /data-list-after-apply-first/);
@@ -836,6 +861,7 @@ test("occupied List a role stays certain after Apply wins the first click", () =
   assert.doesNotMatch(empty, /data-first-click="apply"/);
   assert.doesNotMatch(empty, /data-apply-after-list-first/);
   assert.doesNotMatch(empty, /data-apply-after-list-two/);
+  assert.doesNotMatch(empty, /data-apply-after-list-three/);
 });
 
 test("occupied #1 Apply stays certain after List a role is concentrated", () => {
@@ -851,6 +877,7 @@ test("occupied #1 Apply stays certain after List a role is concentrated", () => 
   const firstClick = html.indexOf('data-first-click="apply"');
   const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const afterListTwo = html.indexOf('data-apply-after-list-two=""');
+  const afterListThree = html.indexOf('data-apply-after-list-three=""');
   const applyHref = html.indexOf('href="/out/lst_acme"');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
@@ -877,7 +904,7 @@ test("occupied #1 Apply stays certain after List a role is concentrated", () => 
     createElement(ListingCard, { listing: listings[1]! }),
   );
   assert.ok(firstClick >= 0 && afterListFirst > firstClick && afterListTwo > afterListFirst);
-  assert.ok(apply > afterListTwo);
+  assert.ok(afterListThree > afterListTwo && apply > afterListThree);
   assert.ok(applyHref >= 0 && applyHref < firstClick);
   assert.ok(listAfter > apply && listFirst >= listAfter && listTwo >= listFirst && listThree >= listTwo);
   assert.ok(hopHref > apply && hopHref < bid && listAfter < bid);
@@ -886,6 +913,7 @@ test("occupied #1 Apply stays certain after List a role is concentrated", () => 
   assert.ok(claim >= 0 && listRole > claim && firstClick > listRole);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /data-apply-after-identity=""/);
@@ -903,6 +931,7 @@ test("occupied #1 Apply stays certain after List a role is concentrated", () => 
   assert.match(html, /data-apply-later=""/);
   assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
   assert.equal((html.match(/data-list-after-apply=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-list-after-apply-first=""/g) ?? []).length, 1);
@@ -915,10 +944,11 @@ test("occupied #1 Apply stays certain after List a role is concentrated", () => 
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(
     html.slice(later),
-    /data-apply-after-list-first|data-apply-after-list-two|data-first-click="apply"|data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply/,
+    /data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three|data-first-click="apply"|data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply/,
   );
   assert.doesNotMatch(laterCard, /data-apply-after-list-first/);
   assert.doesNotMatch(laterCard, /data-apply-after-list-two/);
+  assert.doesNotMatch(laterCard, /data-apply-after-list-three/);
   assert.doesNotMatch(laterCard, /data-first-click="apply"/);
   assert.doesNotMatch(laterCard, /data-list-after-apply-first/);
   assert.doesNotMatch(laterCard, /data-list-after-apply-two/);
@@ -929,6 +959,7 @@ test("occupied #1 Apply stays certain after List a role is concentrated", () => 
   assert.match(empty, /data-empty-identity-first=""/);
   assert.doesNotMatch(empty, /data-apply-after-list-first/);
   assert.doesNotMatch(empty, /data-apply-after-list-two/);
+  assert.doesNotMatch(empty, /data-apply-after-list-three/);
   assert.doesNotMatch(empty, /data-first-click="apply"/);
   assert.doesNotMatch(empty, /data-list-after-apply-first/);
   assert.doesNotMatch(empty, /data-list-after-apply-two/);
@@ -950,6 +981,7 @@ test("occupied live #1 lists after Apply is re-concentrated without another hop"
   const firstClick = html.indexOf('data-first-click="apply"');
   const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const afterListTwo = html.indexOf('data-apply-after-list-two=""');
+  const afterListThree = html.indexOf('data-apply-after-list-three=""');
   const applyHref = html.indexOf('href="/out/lst_acme"');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
@@ -976,7 +1008,7 @@ test("occupied live #1 lists after Apply is re-concentrated without another hop"
     createElement(ListingCard, { listing: listings[1]! }),
   );
   assert.ok(firstClick >= 0 && afterListFirst > firstClick && afterListTwo > afterListFirst);
-  assert.ok(apply > afterListTwo);
+  assert.ok(afterListThree > afterListTwo && apply > afterListThree);
   assert.ok(applyHref >= 0 && applyHref < firstClick);
   assert.ok(listAfter > apply && listFirst >= listAfter && listTwo >= listFirst && listThree >= listTwo);
   assert.ok(Math.abs(listTwo - listAfter) < 120);
@@ -994,6 +1026,7 @@ test("occupied live #1 lists after Apply is re-concentrated without another hop"
   assert.match(html, /Paying less than #1 still lists/);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /class="apply"[^>]*href="\/out\/lst_acme"/);
@@ -1008,13 +1041,14 @@ test("occupied live #1 lists after Apply is re-concentrated without another hop"
   assert.equal((html.match(/href="#claim"/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
   assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(
     html.slice(later),
-    /data-list-after-apply-three|data-list-after-apply-two|data-list-after-apply-first|data-list-after-apply|after Apply|data-apply-after-list-first|data-apply-after-list-two|data-first-click="apply"/,
+    /data-list-after-apply-three|data-list-after-apply-two|data-list-after-apply-first|data-list-after-apply|after Apply|data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three|data-first-click="apply"/,
   );
   assert.doesNotMatch(laterCard, /data-list-after-apply-three/);
   assert.doesNotMatch(laterCard, /data-list-after-apply-two/);
@@ -1022,6 +1056,7 @@ test("occupied live #1 lists after Apply is re-concentrated without another hop"
   assert.doesNotMatch(laterCard, /data-list-after-apply/);
   assert.doesNotMatch(laterCard, /data-apply-after-list-first/);
   assert.doesNotMatch(laterCard, /data-apply-after-list-two/);
+  assert.doesNotMatch(laterCard, /data-apply-after-list-three/);
   assert.doesNotMatch(laterCard, /data-first-click="apply"/);
   assert.match(laterCard, /data-apply-later=""/);
   assert.match(empty, /data-empty-bay-list=""/);
@@ -1032,6 +1067,7 @@ test("occupied live #1 lists after Apply is re-concentrated without another hop"
   assert.doesNotMatch(empty, /data-list-after-apply/);
   assert.doesNotMatch(empty, /data-apply-after-list-first/);
   assert.doesNotMatch(empty, /data-apply-after-list-two/);
+  assert.doesNotMatch(empty, /data-apply-after-list-three/);
   assert.doesNotMatch(empty, /data-first-click="apply"/);
   assert.doesNotMatch(empty, /after Apply/);
 });
@@ -1049,6 +1085,7 @@ test("occupied #1 Apply stays certain after List a role is re-concentrated", () 
   const firstClick = html.indexOf('data-first-click="apply"');
   const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const afterListTwo = html.indexOf('data-apply-after-list-two=""');
+  const afterListThree = html.indexOf('data-apply-after-list-three=""');
   const applyHref = html.indexOf('href="/out/lst_acme"');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
@@ -1075,7 +1112,7 @@ test("occupied #1 Apply stays certain after List a role is re-concentrated", () 
     createElement(ListingCard, { listing: listings[1]! }),
   );
   assert.ok(firstClick >= 0 && afterListFirst > firstClick && afterListTwo > afterListFirst);
-  assert.ok(apply > afterListTwo);
+  assert.ok(afterListThree > afterListTwo && apply > afterListThree);
   assert.ok(applyHref >= 0 && applyHref < firstClick);
   assert.ok(Math.abs(afterListTwo - afterListFirst) < 80);
   assert.ok(listAfter > apply && listFirst >= listAfter && listTwo >= listFirst && listThree >= listTwo);
@@ -1085,6 +1122,7 @@ test("occupied #1 Apply stays certain after List a role is re-concentrated", () 
   assert.ok(claim >= 0 && listRole > claim && firstClick > listRole);
   assert.match(html, /data-apply-after-list-two=""/);
   assert.match(html, /data-apply-after-list-first=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /data-apply-after-identity=""/);
@@ -1102,6 +1140,7 @@ test("occupied #1 Apply stays certain after List a role is re-concentrated", () 
   assert.match(html, /data-apply-later=""/);
   assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
   assert.equal((html.match(/data-list-after-apply=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-list-after-apply-first=""/g) ?? []).length, 1);
@@ -1114,10 +1153,11 @@ test("occupied #1 Apply stays certain after List a role is re-concentrated", () 
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(
     html.slice(later),
-    /data-apply-after-list-two|data-apply-after-list-first|data-first-click="apply"|data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply/,
+    /data-apply-after-list-two|data-apply-after-list-first|data-apply-after-list-three|data-first-click="apply"|data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply/,
   );
   assert.doesNotMatch(laterCard, /data-apply-after-list-two/);
   assert.doesNotMatch(laterCard, /data-apply-after-list-first/);
+  assert.doesNotMatch(laterCard, /data-apply-after-list-three/);
   assert.doesNotMatch(laterCard, /data-first-click="apply"/);
   assert.doesNotMatch(laterCard, /data-list-after-apply-first/);
   assert.doesNotMatch(laterCard, /data-list-after-apply-two/);
@@ -1128,6 +1168,7 @@ test("occupied #1 Apply stays certain after List a role is re-concentrated", () 
   assert.match(empty, /data-empty-identity-first=""/);
   assert.doesNotMatch(empty, /data-apply-after-list-two/);
   assert.doesNotMatch(empty, /data-apply-after-list-first/);
+  assert.doesNotMatch(empty, /data-apply-after-list-three/);
   assert.doesNotMatch(empty, /data-first-click="apply"/);
   assert.doesNotMatch(empty, /data-list-after-apply-first/);
   assert.doesNotMatch(empty, /data-list-after-apply-two/);
@@ -1149,6 +1190,7 @@ test("occupied live #1 lists after Apply is re-concentrated again without anothe
   const firstClick = html.indexOf('data-first-click="apply"');
   const afterListFirst = html.indexOf('data-apply-after-list-first=""');
   const afterListTwo = html.indexOf('data-apply-after-list-two=""');
+  const afterListThree = html.indexOf('data-apply-after-list-three=""');
   const applyHref = html.indexOf('href="/out/lst_acme"');
   const apply = html.indexOf(">Apply<");
   const listAfter = html.indexOf('data-list-after-apply=""');
@@ -1175,7 +1217,7 @@ test("occupied live #1 lists after Apply is re-concentrated again without anothe
     createElement(ListingCard, { listing: listings[1]! }),
   );
   assert.ok(firstClick >= 0 && afterListFirst > firstClick && afterListTwo > afterListFirst);
-  assert.ok(apply > afterListTwo);
+  assert.ok(afterListThree > afterListTwo && apply > afterListThree);
   assert.ok(applyHref >= 0 && applyHref < firstClick);
   assert.ok(listAfter > apply && listFirst >= listAfter && listTwo >= listFirst);
   assert.ok(listThree >= listTwo);
@@ -1194,6 +1236,7 @@ test("occupied live #1 lists after Apply is re-concentrated again without anothe
   assert.match(html, /Paying less than #1 still lists/);
   assert.match(html, /data-apply-after-list-first=""/);
   assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-three=""/);
   assert.match(html, /data-first-click="apply"/);
   assert.match(html, /data-apply-live=""/);
   assert.match(html, /class="apply"[^>]*href="\/out\/lst_acme"/);
@@ -1208,13 +1251,14 @@ test("occupied live #1 lists after Apply is re-concentrated again without anothe
   assert.equal((html.match(/href="#claim"/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
   assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
   assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
   assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(
     html.slice(later),
-    /data-list-after-apply-three|data-list-after-apply-two|data-list-after-apply-first|data-list-after-apply|after Apply|data-apply-after-list-first|data-apply-after-list-two|data-first-click="apply"/,
+    /data-list-after-apply-three|data-list-after-apply-two|data-list-after-apply-first|data-list-after-apply|after Apply|data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three|data-first-click="apply"/,
   );
   assert.doesNotMatch(laterCard, /data-list-after-apply-three/);
   assert.doesNotMatch(laterCard, /data-list-after-apply-two/);
@@ -1222,6 +1266,7 @@ test("occupied live #1 lists after Apply is re-concentrated again without anothe
   assert.doesNotMatch(laterCard, /data-list-after-apply/);
   assert.doesNotMatch(laterCard, /data-apply-after-list-first/);
   assert.doesNotMatch(laterCard, /data-apply-after-list-two/);
+  assert.doesNotMatch(laterCard, /data-apply-after-list-three/);
   assert.doesNotMatch(laterCard, /data-first-click="apply"/);
   assert.match(laterCard, /data-apply-later=""/);
   assert.match(empty, /data-empty-bay-list=""/);
@@ -1232,7 +1277,114 @@ test("occupied live #1 lists after Apply is re-concentrated again without anothe
   assert.doesNotMatch(empty, /data-list-after-apply/);
   assert.doesNotMatch(empty, /data-apply-after-list-first/);
   assert.doesNotMatch(empty, /data-apply-after-list-two/);
+  assert.doesNotMatch(empty, /data-apply-after-list-three/);
   assert.doesNotMatch(empty, /data-first-click="apply"/);
+  assert.doesNotMatch(empty, /after Apply/);
+});
+
+test("occupied #1 Apply stays certain after List a role is re-concentrated again", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const firstClick = html.indexOf('data-first-click="apply"');
+  const afterListFirst = html.indexOf('data-apply-after-list-first=""');
+  const afterListTwo = html.indexOf('data-apply-after-list-two=""');
+  const afterListThree = html.indexOf('data-apply-after-list-three=""');
+  const applyHref = html.indexOf('href="/out/lst_acme"');
+  const apply = html.indexOf(">Apply<");
+  const listAfter = html.indexOf('data-list-after-apply=""');
+  const listFirst = html.indexOf('data-list-after-apply-first=""');
+  const listTwo = html.indexOf('data-list-after-apply-two=""');
+  const listThree = html.indexOf('data-list-after-apply-three=""');
+  const hopHref = html.indexOf('href="#claim"');
+  const afterCopy = html.indexOf("after Apply");
+  const bid = html.indexOf('data-bid=""');
+  const later = html.indexOf('data-listing-id="lst_gamma"');
+  const laterStamp = html.indexOf("data-later-apply");
+  const laterHop = html.indexOf("data-apply-later");
+  const claim = html.indexOf('id="claim"');
+  const listRole = html.indexOf('data-list-role="employer"');
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: listings[1]! }),
+  );
+  assert.ok(firstClick >= 0 && afterListFirst > firstClick && afterListTwo > afterListFirst);
+  assert.ok(afterListThree > afterListTwo && apply > afterListThree);
+  assert.ok(applyHref >= 0 && applyHref < firstClick);
+  assert.ok(Math.abs(afterListThree - afterListTwo) < 80);
+  assert.ok(listAfter > apply && listFirst >= listAfter && listTwo >= listFirst);
+  assert.ok(listThree >= listTwo);
+  assert.ok(hopHref > apply && hopHref < bid && listAfter < bid);
+  assert.ok(afterCopy > listThree && bid > afterCopy && later > bid);
+  assert.ok(laterStamp > later && laterHop > laterStamp);
+  assert.ok(claim >= 0 && listRole > claim && firstClick > listRole);
+  assert.match(html, /data-apply-after-list-three=""/);
+  assert.match(html, /data-apply-after-list-two=""/);
+  assert.match(html, /data-apply-after-list-first=""/);
+  assert.match(html, /data-first-click="apply"/);
+  assert.match(html, /data-apply-live=""/);
+  assert.match(html, /data-apply-after-identity=""/);
+  assert.match(html, /class="apply"[^>]*href="\/out\/lst_acme"/);
+  assert.match(html, />Apply</);
+  assert.match(html, /data-list-after-apply=""/);
+  assert.match(html, /data-list-after-apply-first=""/);
+  assert.match(html, /data-list-after-apply-two=""/);
+  assert.match(html, /data-list-after-apply-three=""/);
+  assert.match(html, /class="list-after-apply"[^>]*href="#claim"/);
+  assert.match(html, />List a role</);
+  assert.match(html, /after Apply/);
+  assert.match(html, /data-list-role="employer"/);
+  assert.match(html, /data-later-apply=""/);
+  assert.match(html, /data-apply-later=""/);
+  assert.equal((html.match(/data-apply-after-list-three=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-list-first=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-first-click="apply"/g) ?? []).length, 1);
+  assert.equal((html.match(/data-list-after-apply=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-list-after-apply-first=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-list-after-apply-two=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-list-after-apply-three=""/g) ?? []).length, 1);
+  assert.equal((html.match(/href="#claim"/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-after-identity=""/g) ?? []).length, 1);
+  assert.equal((html.match(/data-take-apply/g) ?? []).length, 1);
+  assert.equal((html.match(/data-apply-live/g) ?? []).length, 1);
+  assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
+  assert.doesNotMatch(
+    html.slice(later),
+    /data-apply-after-list-three|data-apply-after-list-two|data-apply-after-list-first|data-first-click="apply"|data-list-after-apply|data-list-after-apply-first|data-list-after-apply-two|data-list-after-apply-three|after Apply/,
+  );
+  assert.doesNotMatch(laterCard, /data-apply-after-list-three/);
+  assert.doesNotMatch(laterCard, /data-apply-after-list-two/);
+  assert.doesNotMatch(laterCard, /data-apply-after-list-first/);
+  assert.doesNotMatch(laterCard, /data-first-click="apply"/);
+  assert.doesNotMatch(laterCard, /data-list-after-apply-first/);
+  assert.doesNotMatch(laterCard, /data-list-after-apply-two/);
+  assert.doesNotMatch(laterCard, /data-list-after-apply-three/);
+  assert.doesNotMatch(laterCard, /data-list-after-apply/);
+  assert.match(laterCard, /data-apply-later=""/);
+  assert.match(empty, /data-empty-bay-list=""/);
+  assert.match(empty, /data-empty-identity-first=""/);
+  assert.doesNotMatch(empty, /data-apply-after-list-three/);
+  assert.doesNotMatch(empty, /data-apply-after-list-two/);
+  assert.doesNotMatch(empty, /data-apply-after-list-first/);
+  assert.doesNotMatch(empty, /data-first-click="apply"/);
+  assert.doesNotMatch(empty, /data-list-after-apply-first/);
+  assert.doesNotMatch(empty, /data-list-after-apply-two/);
+  assert.doesNotMatch(empty, /data-list-after-apply-three/);
+  assert.doesNotMatch(empty, /data-list-after-apply/);
   assert.doesNotMatch(empty, /after Apply/);
 });
 
