@@ -583,14 +583,17 @@ a:hover {
   letter-spacing: 0;
 }
 
-.card[data-rank="1"] .meta {
-  font-size: 0.72rem;
+.card[data-rank="1"] .meta[data-later-fact] {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
 }
 
-.card[data-rank="1"] .bid,
-.card[data-rank="1"] .clicks {
+.card[data-rank="1"] .meta[data-later-fact] .bid,
+.card[data-rank="1"] .meta[data-later-fact] .clicks {
+  color: var(--muted);
   font-size: inherit;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .company {

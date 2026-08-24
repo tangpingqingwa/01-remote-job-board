@@ -406,6 +406,20 @@ if [[ -f package.json ]]; then
     || fail "rank tests must stamp the occupied #1 prize title"
   grep -q 'data-prize-title' tests/period.test.ts \
     || fail "period tests must keep empty/closed weeks honest about the prize title"
+  grep -q 'data-later-fact' src/components/board/listing-card.tsx \
+    || fail "occupied #1 must stamp \$bid + clicks as a later fact"
+  grep -q 'meta\[data-later-fact\]' src/app/globals.css \
+    || fail "occupied #1 later-fact money must stay quieter than the prize title"
+  grep -q 'meta\[data-later-fact\] .bid' src/app/globals.css \
+    || fail "occupied #1 later-fact \$bid must stay muted beside the prize title"
+  grep -q 'meta\[data-later-fact\] .clicks' src/app/globals.css \
+    || fail "occupied #1 later-fact clicks must stay muted beside the prize title"
+  grep -q 'stays a later fact' tests/rank.test.ts \
+    || fail "rank tests must keep occupied #1 \$bid a later fact"
+  grep -q 'data-later-fact' tests/rank.test.ts \
+    || fail "rank tests must stamp occupied #1 \$bid as a later fact"
+  grep -q 'data-later-fact' tests/period.test.ts \
+    || fail "period tests must keep empty/closed weeks honest about later-fact \$bid"
   grep -q 'data-later-quiet' src/components/board/listing-card.tsx \
     || fail "later ranks must stamp quieter type/outline/chrome than occupied #1"
   grep -q 'data-later-quiet' src/app/globals.css \
