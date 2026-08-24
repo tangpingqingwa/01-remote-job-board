@@ -141,6 +141,8 @@ test("unpaid stays off the hiring wall — No #1 until Polar reports paid", () =
   assert.match(mixedHtml, /href="\/out\/lst_paid_only"/);
   assert.match(mixedHtml, />Apply</);
   assert.match(mixedHtml, /data-list-role="employer"/);
+  assert.doesNotMatch(mixedHtml, /class="wall-rail"/);
+  assert.ok(mixedHtml.indexOf('data-first-click="apply"') < mixedHtml.indexOf("wall-plate"));
   assert.equal((mixedHtml.match(/data-listing-card/g) ?? []).length, 1);
   assert.equal((mixedHtml.match(/data-prize-title=""/g) ?? []).length, 1);
   assert.doesNotMatch(mixedHtml, /lst_unpaid|lst_abandoned|Ghost|Vapor/);
@@ -163,6 +165,8 @@ test("unpaid stays off the hiring wall — No #1 until Polar reports paid", () =
   assert.match(occupied, /data-prize-title=""/);
   assert.match(occupied, /data-first-click="apply"/);
   assert.match(occupied, /Staff Backend Engineer/);
+  assert.doesNotMatch(occupied, /class="wall-rail"/);
+  assert.ok(occupied.indexOf('data-first-click="apply"') < occupied.indexOf("wall-plate"));
   assert.match(laterCard, /data-apply-later-outlined=""/);
   assert.match(laterCard, /class="later-apply"/);
   assert.doesNotMatch(laterCard, /data-prize-title/);
@@ -593,7 +597,7 @@ test("empty week Claim #1 is the first click — function pick comes after, not 
   const wallRail = liveEmpty.indexOf("wall-rail");
   const occupiedPrize = occupied.indexOf("data-prize-title");
   const occupiedApply = occupied.indexOf('data-first-click="apply"');
-  const occupiedRail = occupied.indexOf("wall-rail");
+  const occupiedRail = occupied.indexOf('class="wall-rail"');
   const occupiedPlate = occupied.indexOf("wall-plate");
   const occupiedClaim = occupied.indexOf('id="claim"');
   assert.ok(claim >= 0 && claimTitle > claim && firstClick > claimTitle);
@@ -617,11 +621,12 @@ test("empty week Claim #1 is the first click — function pick comes after, not 
   assert.doesNotMatch(liveEmpty, /<h1 class="wall-lane-name">Backend<\/h1>/);
   assert.match(occupied, /data-prize-title=""/);
   assert.match(occupied, /data-first-click="apply"/);
-  assert.match(occupied, /wall-rail/);
   assert.match(occupied, /wall-plate/);
-  assert.ok(occupiedRail >= 0 && occupiedPlate > occupiedRail);
+  assert.doesNotMatch(occupied, /class="wall-rail"/);
+  assert.equal(occupiedRail, -1);
   assert.ok(occupiedPrize >= 0 && occupiedApply > occupiedPrize);
-  assert.ok(occupiedClaim > occupiedApply);
+  assert.ok(occupiedPlate > occupiedApply);
+  assert.ok(occupiedClaim > occupiedPlate);
   assert.match(occupied, /class="board hiring-wall"/);
   assert.doesNotMatch(occupied, /<select[^>]*name="lane"/);
   assert.match(laterCard, /data-later-quiet=""/);
@@ -633,6 +638,81 @@ test("empty week Claim #1 is the first click — function pick comes after, not 
   assert.match(closedEmpty, /wall-plate/);
   assert.doesNotMatch(closedEmpty, /data-first-click="claim"/);
   assert.doesNotMatch(closedEmpty, /<select[^>]*name="lane"/);
+});
+
+test("occupied wall keeps one first click — Apply #1, function plates stay after the listing", () => {
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: rankListings(specTieRows),
+    }),
+  );
+  const liveEmpty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const closedEmpty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+      live: false,
+    }),
+  );
+  const laterCard = renderToStaticMarkup(
+    createElement(ListingCard, { listing: rankListings(specTieRows)[1]! }),
+  );
+  const prize = occupied.indexOf("data-prize-title");
+  const title = occupied.indexOf("Staff Backend Engineer");
+  const apply = occupied.indexOf('data-first-click="apply"');
+  const applyHref = occupied.indexOf('href="/out/lst_acme"');
+  const applyLabel = occupied.indexOf(">Apply<");
+  const plates = occupied.indexOf("wall-plate");
+  const rail = occupied.indexOf('class="wall-rail"');
+  const claim = occupied.indexOf('id="claim"');
+  const listRole = occupied.indexOf('data-list-role="employer"');
+  const emptyClaim = liveEmpty.indexOf("Claim #1 for");
+  const emptyFirstClick = liveEmpty.indexOf('data-first-click="claim"');
+  const emptyLane = liveEmpty.indexOf('name="lane"');
+  assert.ok(prize >= 0 && title > prize && applyHref > title);
+  assert.ok(apply > applyHref && applyLabel > apply);
+  assert.ok(plates > applyLabel);
+  assert.equal(rail, -1);
+  assert.ok(claim > plates && listRole > claim);
+  assert.ok(emptyClaim >= 0 && emptyFirstClick > emptyClaim && emptyLane > emptyFirstClick);
+  assert.match(occupied, /data-prize-title=""/);
+  assert.match(occupied, /data-first-click="apply"/);
+  assert.match(occupied, /Staff Backend Engineer/);
+  assert.match(occupied, /wall-plate/);
+  assert.doesNotMatch(occupied, /class="wall-rail"/);
+  assert.equal((occupied.match(/wall-plate/g) ?? []).length, 8);
+  assert.equal((occupied.match(/data-first-click="apply"/g) ?? []).length, 1);
+  assert.doesNotMatch(occupied, /data-first-click="claim"/);
+  assert.doesNotMatch(occupied, /<select[^>]*name="lane"/);
+  assert.doesNotMatch(occupied, /data-empty-lane-pick|data-lane-after-claim|data-empty-function-pick|hiring-wall-empty-first/);
+  assert.doesNotMatch(occupied, /data-occupied-plates|data-plates-after-listing|data-apply-one-first|data-list-after-apply-eight/);
+  assert.match(liveEmpty, /data-first-click="claim"/);
+  assert.match(liveEmpty, /Claim #1, then pick the function/);
+  assert.match(liveEmpty, /<select[^>]*name="lane"/);
+  assert.doesNotMatch(liveEmpty, /wall-rail|wall-plate/);
+  assert.doesNotMatch(liveEmpty, /data-first-click="apply"/);
+  assert.match(closedEmpty, /wall-rail/);
+  assert.match(closedEmpty, /wall-plate/);
+  assert.doesNotMatch(closedEmpty, /data-first-click="apply"/);
+  assert.doesNotMatch(closedEmpty, /data-first-click="claim"/);
+  assert.match(laterCard, /class="later-apply"/);
+  assert.match(laterCard, /data-apply-later-outlined=""/);
+  assert.doesNotMatch(laterCard, /class="apply"/);
+  assert.ok(cssSource.includes(".hiring-wall:not(:has(.wall-rail))"));
+  assert.ok(cssSource.includes(".wall-bay > .lane-tabs"));
+  assert.ok(cssSource.includes(".wall-bay > .wall-rail-kicker"));
 });
 
 test("occupied live wall keeps Outbid and does not hide raise rules", () => {
