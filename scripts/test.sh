@@ -363,6 +363,18 @@ if [[ -f package.json ]]; then
     || fail "period tests must keep closed-week Apply after List a role is re-concentrated again unstamped"
   grep -q 'data-salary' src/components/board/listing-card.tsx \
     || fail "job card must render optional salary as a fact"
+  grep -q 'data-prize-title' src/components/board/listing-card.tsx \
+    || fail "occupied #1 must stamp the role title as the prize"
+  grep -q 'data-prize-title' src/app/globals.css \
+    || fail "occupied #1 prize title must be visually certain"
+  grep -q 'clamp(1.55rem' src/app/globals.css \
+    || fail "occupied #1 prize title must read larger than \$bid + clicks"
+  grep -q 'role title is the prize before' tests/rank.test.ts \
+    || fail "rank tests must cover prize-before-price on occupied #1"
+  grep -q 'data-prize-title' tests/rank.test.ts \
+    || fail "rank tests must stamp the occupied #1 prize title"
+  grep -q 'data-prize-title' tests/period.test.ts \
+    || fail "period tests must keep empty/closed weeks honest about the prize title"
   grep -q 'hiring wall' tests/rank.test.ts \
     || fail "rank tests must cover the hiring-wall layout"
   if grep -nE 'top company|featured employer|star rating' \
