@@ -195,6 +195,10 @@ if [[ -f package.json ]]; then
     || fail "live later-rank Apply must be the outbound hop"
   grep -q 'data-apply-later' src/app/globals.css \
     || fail "later-rank Apply hop must be visually certain"
+  grep -q 'data-apply-later-outlined' src/components/board/listing-card.tsx \
+    || fail "later-rank Apply must stamp the outlined hop, not a filled #1"
+  grep -q 'data-apply-later-outlined' src/app/globals.css \
+    || fail "later-rank outlined Apply must stay visually certain"
   grep -q 'data-later-apply' tests/rank.test.ts \
     || fail "rank tests must cover taking Apply on a later live sheet"
   grep -q 'data-later-apply' tests/period.test.ts \
@@ -410,12 +414,20 @@ if [[ -f package.json ]]; then
     || fail "later-rank titles must stay quieter than the occupied #1 prize"
   grep -q 'apply\[data-apply-later\]' src/app/globals.css \
     || fail "later-rank Apply must stay an outlined hop"
+  grep -q 'apply\[data-apply-later\]\[data-apply-later-outlined\]' src/app/globals.css \
+    || fail "later-rank Apply must stay outlined on the existing hop"
   grep -q 'border: 1px solid var(--fg)' src/app/globals.css \
     || fail "later-rank Apply must stay an outline, not a filled #1 hop"
   grep -q 'background: transparent' src/app/globals.css \
     || fail "later-rank Apply must stay outlined, not filled like occupied #1"
   grep -q 'later ranks stay quieter than occupied #1' tests/rank.test.ts \
     || fail "rank tests must cover quieter later ranks on an occupied wall"
+  grep -q 'later-rank Apply stays outlined' tests/rank.test.ts \
+    || fail "rank tests must keep later-rank Apply outlined — filled Apply is #1 only"
+  grep -q 'data-apply-later-outlined' tests/rank.test.ts \
+    || fail "rank tests must stamp later-rank Apply as outlined"
+  grep -q 'data-apply-later-outlined' tests/period.test.ts \
+    || fail "period tests must keep closed-week later Apply unstamped for outline"
   grep -q 'data-later-quiet' tests/rank.test.ts \
     || fail "rank tests must stamp quieter later ranks"
   grep -q 'data-later-quiet' tests/period.test.ts \
