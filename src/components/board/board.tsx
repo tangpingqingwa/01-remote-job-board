@@ -22,6 +22,7 @@ export function Board({
 }: BoardProps) {
   const topBid = listings[0]?.bidUsd ?? 0;
   const defaultAmount = topBid > 0 ? topBid + 1 : MIN_BID_USD;
+  const emptyClaimFirst = live && listings.length === 0;
 
   return (
     <main
@@ -30,6 +31,7 @@ export function Board({
       data-hiring-wall=""
       data-lane={lane}
       data-period-live={live ? "true" : "false"}
+      {...(emptyClaimFirst ? { "data-empty-claim-first": "" } : {})}
     >
       <aside className="wall-rail">
         <p className="wall-rail-kicker">Function lanes</p>

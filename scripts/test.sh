@@ -147,6 +147,50 @@ if [[ -f package.json ]]; then
     || fail "live empty claim must stamp honesty"
   grep -q 'data-empty-claim' src/components/board/bid-form.tsx \
     || fail "live empty claim must stamp Claim #1 as the honest lead"
+  grep -q 'data-empty-claim-first' src/components/board/bid-form.tsx \
+    || fail "live empty claim must stamp Claim #1 as the only first click"
+  grep -q 'empty-claim-first' src/components/board/bid-form.tsx \
+    || fail "live empty claim must use the empty-claim-first class"
+  grep -q 'data-first-click": "claim"' src/components/board/bid-form.tsx \
+    || fail "live empty Claim #1 must win the first click"
+  grep -q 'data-empty-claim-first' src/components/board/board.tsx \
+    || fail "live empty wall must stamp Claim #1 first-click isolation"
+  grep -q 'data-empty-claim-first' src/app/globals.css \
+    || fail "empty Claim #1 first-click isolation must be visually certain"
+  grep -q 'data-first-click="claim"' src/app/globals.css \
+    || fail "empty Claim #1 first-click must stay visually certain"
+  grep -q 'empty week Claim #1 stays the only first click' tests/rank.test.ts \
+    || fail "rank tests must cover empty-week Claim #1 as the only first click"
+  grep -q 'data-empty-claim-first' tests/rank.test.ts \
+    || fail "rank tests must stamp empty-week Claim #1 first-click"
+  grep -q 'data-first-click="claim"' tests/rank.test.ts \
+    || fail "rank tests must stamp empty-week first-click Claim #1"
+  grep -q 'data-empty-claim-first' tests/period.test.ts \
+    || fail "period tests must keep closed weeks unstamped for empty Claim #1 first-click"
+  grep -q 'data-first-click="claim"' tests/period.test.ts \
+    || fail "period tests must keep closed weeks unstamped for first-click Claim #1"
+  if grep -nE 'data-empty-claim-after|data-claim-after-empty-[0-9]' \
+    src/components/board/bid-form.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "empty Claim #1 first-click must not add a second named hop"
+  fi
+  empty_claim_rule="$(awk '/Empty week: Claim #1 is the only first click/,/^\}/' src/app/globals.css)"
+  echo "$empty_claim_rule" | grep -q 'display: none' \
+    || fail "empty Claim #1 CSS must hide occupied List a role / prize-title chrome"
+  echo "$empty_claim_rule" | grep -q 'list-this-role' \
+    || fail "empty Claim #1 CSS must hide List a role on a blank week"
+  echo "$empty_claim_rule" | grep -q 'data-prize-title' \
+    || fail "empty Claim #1 CSS must hide occupied prize-title chrome"
+  echo "$empty_claim_rule" | grep -q 'data-list-after-apply' \
+    || fail "empty Claim #1 CSS must hide List a role after Apply"
+  if echo "$empty_claim_rule" | grep -q 'background:'; then
+    fail "empty Claim #1 must hide occupied chrome, not recolor the hiring wall"
+  fi
+  grep -q 'List a role' src/components/board/bid-form.tsx \
+    || fail "empty Claim #1 cut must keep occupied List a role"
+  grep -q 'data-prize-title' src/components/board/listing-card.tsx \
+    || fail "empty Claim #1 cut must keep occupied #1 prize title"
+  grep -q 'data-apply-later-outlined' src/components/board/listing-card.tsx \
+    || fail "empty Claim #1 cut must keep later-rank Apply outlined"
   grep -q 'data-empty-honest' src/components/board/leaderboard.tsx \
     || fail "empty and closed-empty weeks must stamp honesty"
   grep -q 'data-empty-honest' src/app/globals.css \

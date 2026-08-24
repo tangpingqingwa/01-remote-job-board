@@ -475,6 +475,26 @@ a:hover {
   pointer-events: none;
 }
 
+/* Empty week: Claim #1 is the only first click. Occupied List a role / prize-title stay off. */
+.hiring-wall[data-empty-claim-first] .list-this-role,
+.hiring-wall[data-empty-claim-first] .list-after-apply-wrap,
+.hiring-wall[data-empty-claim-first] [data-list-after-apply],
+.hiring-wall[data-empty-claim-first] [data-prize-title],
+.hiring-wall[data-empty-claim-first] [data-later-fact],
+.hiring-wall[data-empty-claim-first] [data-take-apply],
+.hiring-wall[data-empty-claim-first] [data-first-click="apply"],
+.claim.empty-claim-first[data-empty-claim-first] .list-this-role,
+.claim.empty-claim-first[data-empty-claim-first] [data-list-after-apply],
+.claim.empty-claim-first[data-empty-claim-first] [data-prize-title] {
+  display: none;
+}
+
+.claim.empty-claim-first[data-empty-claim-first]
+  h2[data-empty-claim][data-first-click="claim"] {
+  display: flex;
+  font-size: clamp(1.85rem, 4vw, 2.55rem);
+}
+
 .empty-lane[data-empty-closed][data-empty-honest] {
   pointer-events: auto;
 }

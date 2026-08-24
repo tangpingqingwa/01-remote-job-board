@@ -27,14 +27,18 @@ export function BidForm({
 
   return (
     <section
-      className="claim"
+      className={laneEmpty ? "claim empty-claim-first" : "claim"}
       id="claim"
       data-lane-empty={laneEmpty ? "true" : "false"}
       {...(laneEmpty
-        ? { "data-empty-bay-list": "", "data-empty-honest": "" }
+        ? {
+            "data-empty-bay-list": "",
+            "data-empty-honest": "",
+            "data-empty-claim-first": "",
+          }
         : {})}
       {...(listRole ? { "data-list-role": "employer" } : {})}
-      aria-label={listRole ? "List a role" : undefined}
+      aria-label={listRole ? "List a role" : "Claim #1"}
     >
       <form
         action="/checkout"
@@ -68,7 +72,11 @@ export function BidForm({
             />
           </div>
         ) : null}
-        <h2 {...(laneEmpty ? { "data-empty-claim": "" } : {})}>
+        <h2
+          {...(laneEmpty
+            ? { "data-empty-claim": "", "data-first-click": "claim" }
+            : {})}
+        >
           <span>Claim #1 for</span>
           <span className="amount-stepper">
             <button
