@@ -314,13 +314,14 @@ test("occupied live wall keeps Outbid and does not hide raise rules", () => {
   assert.match(html, /Already on this lane/);
   assert.match(html, /Paying less than #1/);
   assert.match(html, /name="identity"/);
+  assert.match(html, /data-one-identity=""/);
+  assert.match(html, /identity-label/);
   assert.doesNotMatch(html, /data-empty-lane/);
   assert.doesNotMatch(html, /data-empty-bay-list/);
   assert.doesNotMatch(html, /data-empty-honest/);
   assert.doesNotMatch(html, /data-empty-claim/);
   assert.doesNotMatch(html, /data-empty-identity/);
   assert.doesNotMatch(html, /data-empty-identity-first/);
-  assert.doesNotMatch(html, /identity-label/);
   assert.doesNotMatch(html, /\$5 takes #1/);
   const occupiedIdentity = html.indexOf('name="identity"');
   const occupiedClaim = html.indexOf("Claim #1 for");
@@ -616,6 +617,57 @@ test("hiring wall treats function lanes as the product and stays a job board", (
   assert.doesNotMatch(silent, /\$140,000|\$0|competitive/i);
 });
 
+test("occupied List a role does not ask for a second name", () => {
+  const listings = rankListings(specTieRows);
+  const html = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+    }),
+  );
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const claim = html.indexOf('id="claim"');
+  const listRole = html.indexOf('data-list-role="employer"');
+  const oneIdentity = html.indexOf("data-one-identity");
+  const label = html.indexOf("identity-label");
+  const identity = html.indexOf('name="identity"');
+  const outbid = html.indexOf(">Outbid<");
+  const applyHref = html.indexOf('href="/out/lst_acme"');
+  assert.ok(claim >= 0 && listRole > claim && oneIdentity > listRole);
+  assert.ok(label > oneIdentity && identity > label && outbid > identity);
+  assert.ok(applyHref > outbid);
+  assert.match(html, /data-list-role="employer"/);
+  assert.match(html, /data-one-identity=""/);
+  assert.match(html, /htmlFor="identity"|for="identity"/);
+  assert.match(html, /Apply URL or company handle/);
+  assert.match(html, /name="identity"/);
+  assert.match(html, /Claim #1 for/);
+  assert.match(html, />Outbid</);
+  assert.match(html, /href="\/out\/lst_acme"/);
+  assert.match(html, />Apply</);
+  assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
+  assert.equal((html.match(/data-one-identity=""/g) ?? []).length, 1);
+  assert.equal((html.match(/name="company"/g) ?? []).length, 0);
+  assert.equal((html.match(/name="contact"/g) ?? []).length, 0);
+  assert.equal((html.match(/name="title"/g) ?? []).length, 0);
+  assert.doesNotMatch(html, /name="company"|name="contact"|Company name|Contact name/);
+  assert.doesNotMatch(html, /data-empty-identity-first/);
+  assert.doesNotMatch(empty, /data-one-identity/);
+  assert.match(empty, /Claim #1 for/);
+  assert.equal((empty.match(/name="identity"/g) ?? []).length, 1);
+  assert.doesNotMatch(empty, /href="\/out\//);
+  assert.doesNotMatch(empty, />Apply</);
+});
+
 test("occupied live claim stamps List a role so an employer can find the write", () => {
   const listings = rankListings(specTieRows);
   const html = renderToStaticMarkup(
@@ -785,7 +837,6 @@ test("occupied #1 Apply stays the certain hop after empty-bay identity leads", (
   assert.equal((html.match(/data-apply-after-list-six=""/g) ?? []).length, 1);
   assert.equal((html.match(/name="identity"/g) ?? []).length, 1);
   assert.doesNotMatch(html, /data-empty-identity-first/);
-  assert.doesNotMatch(html, /identity-label/);
   assert.doesNotMatch(
     html.slice(later),
     /data-apply-after-identity|data-first-click="apply"|data-apply-after-list-first|data-apply-after-list-two|data-apply-after-list-three|data-apply-after-list-four|data-apply-after-list-five|data-apply-after-list-six/,

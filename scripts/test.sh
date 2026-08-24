@@ -209,6 +209,19 @@ if [[ -f package.json ]]; then
     || fail "rank tests must cover listing a role on an occupied live wall"
   grep -q 'data-list-role' tests/period.test.ts \
     || fail "period tests must keep closed-week history unstamped for listing"
+  grep -q 'data-one-identity' src/components/board/bid-form.tsx \
+    || fail "occupied List a role must stamp one identity field"
+  grep -q 'data-one-identity' src/app/globals.css \
+    || fail "occupied one identity field must be visually certain"
+  if grep -nE 'name="(company|contact)"' src/components/board/bid-form.tsx >/dev/null; then
+    fail "List a role must not ask for a second name"
+  fi
+  grep -q 'does not ask for a second name' tests/rank.test.ts \
+    || fail "rank tests must cover List a role without a second name"
+  grep -q 'data-one-identity' tests/rank.test.ts \
+    || fail "rank tests must stamp one identity field on occupied List a role"
+  grep -q 'data-one-identity' tests/period.test.ts \
+    || fail "period tests must keep closed weeks unstamped for one identity"
   grep -q 'data-list-after-apply' src/components/board/listing-card.tsx \
     || fail "occupied #1 must stamp List a role after Apply"
   grep -q 'after Apply' src/components/board/listing-card.tsx \

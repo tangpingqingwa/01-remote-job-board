@@ -358,6 +358,31 @@ a:hover {
   color: var(--fg);
 }
 
+.claim[data-list-role] .bid-row[data-one-identity] {
+  align-items: stretch;
+}
+
+.claim[data-list-role] .bid-row[data-one-identity] .identity-label {
+  flex: 1 1 100%;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  line-height: 1.2;
+}
+
+.claim[data-list-role] .bid-row[data-one-identity] input[name="identity"] {
+  flex: 1 1 16rem;
+  min-height: 3rem;
+  border: 2px solid var(--fg);
+  background: #fff;
+  font-weight: 600;
+}
+
+.claim[data-list-role] .bid-row[data-one-identity] input[name="identity"]:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .outbid {
   height: 2.75rem;
   padding: 0 1.4rem;
