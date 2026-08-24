@@ -324,25 +324,35 @@ a:hover {
   font: inherit;
 }
 
+.claim[data-empty-bay-list] .outbid[data-first-click="claim"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 3.15rem;
+  margin-top: 1rem;
+}
+
 .claim[data-empty-bay-list] .bid-row[data-empty-identity-first] {
-  margin-top: 0;
-  margin-bottom: 0.95rem;
+  margin-top: 0.85rem;
+  margin-bottom: 0;
 }
 
 .claim[data-empty-bay-list] .identity-label {
-  font-size: 1.05rem;
-  letter-spacing: -0.02em;
-  text-transform: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
   line-height: 1.2;
 }
 
 .claim[data-empty-bay-list] .bid-row input[name="identity"] {
   flex: 1 1 100%;
-  height: 3rem;
-  min-height: 3rem;
-  border: 2px solid var(--fg);
-  background: #fff;
-  font-weight: 600;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--line);
+  background: #fffdf6;
+  font-weight: 400;
 }
 
 .claim[data-empty-bay-list] .bid-row input[name="identity"]:focus {
