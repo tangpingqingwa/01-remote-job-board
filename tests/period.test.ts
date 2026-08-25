@@ -386,6 +386,11 @@ test("closed-week board is read-only history of that period", () => {
   assert.match(html, /data-period="2026-W33"/);
   assert.match(html, /data-period-live="false"/);
   assert.match(html, /Closed week/);
+  assert.match(html, /Week 2026-W33 is read-only week history/);
+  assert.doesNotMatch(
+    html,
+    /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/,
+  );
   assert.doesNotMatch(html, /data-week-window="rolling-7d"/);
   assert.doesNotMatch(
     html,

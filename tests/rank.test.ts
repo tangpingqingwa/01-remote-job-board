@@ -4331,7 +4331,11 @@ test("closed empty live-pointer is rolling last 7 days from paid placement — n
 
   assert.match(closedEmpty, /data-period-live="false"/);
   assert.match(closedEmpty, /Closed week — read only/);
-  assert.match(closedEmpty, /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/);
+  assert.match(closedEmpty, /Week 2026-W33 is read-only week history/);
+  assert.doesNotMatch(
+    closedEmpty,
+    /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/,
+  );
   assert.match(closedEmpty, /data-empty-closed="true"/);
   assert.match(closedEmpty, /data-empty-honest=""/);
   assert.match(closedEmpty, /Bids are closed/);
@@ -4406,5 +4410,161 @@ test("closed empty live-pointer is rolling last 7 days from paid placement — n
   assert.match(unpaidHtml, /data-empty-window=""/);
   assert.doesNotMatch(unpaidHtml, /Ghost|Unpaid Staff Engineer/);
   assert.doesNotMatch(unpaidHtml, /data-live-week/);
+  assert.doesNotMatch(unpaidHtml, /data-listing-card/);
+});
+
+test("closed empty history fact is closed weekId — not this week's wall", () => {
+  const listings = rankListings(specTieRows);
+  const closedEmpty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+      live: false,
+    }),
+  );
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: liveRankResetAt(listings, new Date("2026-08-17T14:00:00.000Z")),
+      listings,
+    }),
+  );
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const closedOccupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+      live: false,
+    }),
+  );
+  const unpaidHtml = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T14:00:00.000Z",
+      listings: rankListings([
+        fixtureListing({
+          id: "lst_unpaid_closed_fact",
+          company: "Ghost",
+          title: "Unpaid Staff Engineer",
+          bidUsd: 50_000,
+          paidUsd: 0,
+          clicks: 99,
+          createdAt: "2026-08-17T08:00:00.000Z",
+        }),
+      ]),
+    }),
+  );
+
+  const closedMark = closedEmpty.indexOf('data-empty-closed="true"');
+  const factAt = closedEmpty.indexOf("Week 2026-W33 is read-only week history");
+  const pointerAt = closedEmpty.indexOf('data-live-week=""');
+  const pointerCopyAt = closedEmpty.indexOf(
+    "Open the live Backend wall for the rolling last 7 days from paid placement",
+  );
+  assert.ok(
+    factAt >= 0,
+    "closed empty history fact must name the closed weekId as read-only week history",
+  );
+  assert.ok(closedMark >= 0 && factAt < closedMark);
+  assert.ok(pointerAt > closedMark);
+  assert.ok(pointerCopyAt > pointerAt);
+
+  assert.match(closedEmpty, /data-period-live="false"/);
+  assert.match(closedEmpty, /Period 2026-W33\. Next reset 2026-08-24T00:00:00\.000Z/);
+  assert.match(closedEmpty, /Closed week — read only/);
+  assert.match(closedEmpty, /Week 2026-W33 is read-only week history/);
+  assert.match(closedEmpty, /Rank is the bid/);
+  assert.doesNotMatch(
+    closedEmpty,
+    /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/,
+  );
+  assert.doesNotMatch(closedEmpty, /this week(?:'|&#x27;|&apos;)s wall/);
+  assert.match(closedEmpty, /data-empty-closed="true"/);
+  assert.match(closedEmpty, /data-empty-honest=""/);
+  assert.match(closedEmpty, /Bids are closed/);
+  assert.match(closedEmpty, /This lane was empty/);
+  assert.match(closedEmpty, /data-live-week=""/);
+  assert.match(
+    closedEmpty,
+    /Open the live Backend wall for the rolling last 7 days from paid placement/,
+  );
+  assert.doesNotMatch(closedEmpty, /Open this week/);
+  assert.doesNotMatch(closedEmpty, /data-week-window="rolling-7d"/);
+  assert.doesNotMatch(
+    closedEmpty,
+    /Rolling last 7 days from paid placement\. Week 2026-W33 is an audit label/,
+  );
+  assert.doesNotMatch(closedEmpty, /This remote \(global\) wall is empty/);
+  assert.doesNotMatch(closedEmpty, /Not Monday 00:00 UTC/);
+  assert.doesNotMatch(closedEmpty, /wall is the rolling last 7 days from paid placement/);
+  assert.doesNotMatch(closedEmpty, /data-empty-window/);
+  assert.doesNotMatch(closedEmpty, /data-bid-form/);
+  assert.doesNotMatch(closedEmpty, />Outbid</);
+  assert.doesNotMatch(closedEmpty, /Claim #1 for/);
+  assert.doesNotMatch(closedEmpty, /data-first-click="apply"/);
+  assert.doesNotMatch(closedEmpty, /data-first-click="claim"/);
+  assert.doesNotMatch(closedEmpty, /data-listing-card/);
+  assert.doesNotMatch(closedEmpty, />Apply</);
+  assert.doesNotMatch(
+    closedEmpty,
+    /data-closed-empty-fact|data-history-fact-hop|data-closed-weekid-hop|data-empty-history-hop/,
+  );
+  assert.doesNotMatch(closedEmpty, /data-list-after-apply-N|data-list-after-apply-eight/);
+  assert.match(closedEmpty, /wall-rail/);
+
+  assert.match(occupied, /data-week-window="rolling-7d"/);
+  assert.match(
+    occupied,
+    /This remote \(global\) Backend wall is the rolling last 7 days from paid placement/,
+  );
+  assert.match(occupied, /aria-label="Rolling last 7 days #1"/);
+  assert.match(occupied, /aria-label="Later ranks in the rolling last 7 days"/);
+  assert.match(occupied, /data-first-click="apply"/);
+  assert.match(occupied, />Apply</);
+  assert.ok(occupied.indexOf('data-first-click="apply"') < occupied.indexOf("wall-plate"));
+  assert.ok(occupied.indexOf("wall-plate") < occupied.indexOf('data-list-role="employer"'));
+  assert.doesNotMatch(occupied, /class="wall-rail"/);
+  assert.doesNotMatch(occupied, /Week 2026-W34 is read-only week history/);
+  assert.doesNotMatch(occupied, /This week(?:'|&#x27;|&apos;)s #1/);
+  assert.doesNotMatch(occupied, /Later ranks this week/);
+
+  assert.match(empty, /data-empty-window=""/);
+  assert.match(empty, /This remote \(global\) wall is empty/);
+  assert.match(empty, /Not Monday 00:00 UTC/);
+  assert.match(empty, /The last 7 days from paid placement are empty/);
+  assert.match(empty, /Claim #1 for/);
+  assert.doesNotMatch(empty, /Week 2026-W34 is read-only week history/);
+  assert.doesNotMatch(empty, /This week/);
+  assert.doesNotMatch(empty, /data-week-window/);
+
+  assert.match(closedOccupied, /Closed week — read only/);
+  assert.match(closedOccupied, /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/);
+  assert.doesNotMatch(closedOccupied, /Week 2026-W33 is read-only week history/);
+  assert.match(closedOccupied, /aria-label="This week(?:'|&#x27;|&apos;)s #1"/);
+  assert.match(closedOccupied, /aria-label="Later ranks this week"/);
+  assert.doesNotMatch(closedOccupied, /data-live-week/);
+  assert.doesNotMatch(closedOccupied, /Open the live Backend wall/);
+  assert.doesNotMatch(closedOccupied, /aria-label="Rolling last 7 days #1"/);
+  assert.doesNotMatch(closedOccupied, /Later ranks in the rolling last 7 days/);
+  assert.doesNotMatch(closedOccupied, /data-bid-form/);
+  assert.doesNotMatch(closedOccupied, />Outbid</);
+  assert.match(closedOccupied, /wall-rail/);
+
+  assert.match(unpaidHtml, /data-empty-window=""/);
+  assert.doesNotMatch(unpaidHtml, /Ghost|Unpaid Staff Engineer/);
+  assert.doesNotMatch(unpaidHtml, /Week 2026-W34 is read-only week history/);
   assert.doesNotMatch(unpaidHtml, /data-listing-card/);
 });
