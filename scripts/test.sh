@@ -905,16 +905,22 @@ if [[ -f package.json ]]; then
   fi
   grep -qF 'Closed week history ${periodId} — read only.' src/components/board/board.tsx \
     || fail "closed occupied period stamp must name closed week history — not a live Next reset clock"
-  grep -qF 'Period ${periodId}. Next reset ${nextResetAt}. Closed week — read only.' src/components/board/board.tsx \
-    || fail "closed empty period stamp must keep Period/Next reset Closed week — read only"
+  if grep -qF 'Period ${periodId}. Next reset ${nextResetAt}. Closed week — read only.' src/components/board/board.tsx; then
+    fail "closed empty period stamp must not print a live Next reset clock"
+  fi
   grep -qF 'Rolling last 7 days from paid placement. Week ${periodId} is an audit label. Next reset ${nextResetAt}.' src/components/board/board.tsx \
     || fail "occupied week-window stamp must keep Next reset on the live rolling window"
   grep -q 'closed occupied period stamp is closed week history' tests/rank.test.ts \
     || fail "rank tests must cover closed occupied period stamp as closed week history"
+  grep -q 'closed empty period stamp is closed week history' tests/rank.test.ts \
+    || fail "rank tests must cover closed empty period stamp as closed week history"
   grep -qF 'Closed week history 2026-W33 — read only' tests/period.test.ts \
     || fail "period tests must name closed occupied period stamp as closed week history"
-  grep -qF 'Period 2026-W33\. Next reset 2026-08-24T00:00:00\.000Z' tests/period.test.ts \
-    || fail "period tests must keep closed empty period stamp as Period/Next reset"
+  [[ "$(grep -cF 'Closed week history 2026-W33 — read only' tests/period.test.ts)" -ge 2 ]] \
+    || fail "period tests must name closed empty period stamp as closed week history"
+  if grep -qF 'Period 2026-W33\. Next reset 2026-08-24T00:00:00\.000Z' tests/period.test.ts; then
+    fail "period tests must not keep closed empty period stamp as a live Next reset clock"
+  fi
   closed_occupied_period="$(grep -F 'Closed week history ${periodId}' src/components/board/board.tsx || true)"
   echo "$closed_occupied_period" | grep -qF 'Closed week history ${periodId} — read only.' \
     || fail "closed occupied period stamp arm must name closed week history"
@@ -924,6 +930,16 @@ if [[ -f package.json ]]; then
   if grep -nE 'data-closed-occupied-period|data-history-period-hop|data-closed-period-hop|data-occupied-period-stamp' \
     src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
     fail "closed occupied period stamp must not add a second named hop"
+  fi
+  closed_empty_period="$(awk '/: emptyFirst/,/Closed week history/' src/components/board/board.tsx)"
+  echo "$closed_empty_period" | grep -qF 'Closed week history ${periodId} — read only.' \
+    || fail "closed empty period stamp arm must name closed week history"
+  if echo "$closed_empty_period" | grep -q "Next reset"; then
+    fail "closed empty period stamp must not print a live Next reset clock"
+  fi
+  if grep -nE 'data-closed-empty-period|data-empty-period-hop|data-closed-empty-period-hop|data-empty-period-stamp' \
+    src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
+    fail "closed empty period stamp must not add a second named hop"
   fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"

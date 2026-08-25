@@ -65,9 +65,7 @@ export function Board({
               ? `Rolling last 7 days from paid placement. Week ${periodId} is an audit label. Next reset ${nextResetAt}.`
               : emptyFirst
                 ? "Rolling last 7 days from paid placement. Not Monday 00:00 UTC."
-                : laneEmpty
-                  ? `Period ${periodId}. Next reset ${nextResetAt}. Closed week — read only.`
-                  : `Closed week history ${periodId} — read only.`}
+                : `Closed week history ${periodId} — read only.`}
           </p>
           {emptyFirst ? (
             <p className="wall-lane-fact">
