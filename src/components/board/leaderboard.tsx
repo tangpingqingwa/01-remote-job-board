@@ -50,7 +50,7 @@ export function Leaderboard({
             the bid. Closed week history was empty. Nobody is invented here.
           </p>
           <p>
-            Bids are closed.{" "}
+            Bids are closed in closed week history.{" "}
             <a href={`/?lane=${lane}`} data-live-week="">
               Open the live {laneLabel(lane)} wall for the rolling last 7 days from paid placement
             </a>

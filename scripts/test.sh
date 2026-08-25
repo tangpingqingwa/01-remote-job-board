@@ -980,6 +980,25 @@ if [[ -f package.json ]]; then
     src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "closed empty body must not add a second named hop"
   fi
+  grep -q 'Bids are closed in closed week history' src/components/board/leaderboard.tsx \
+    || fail "closed empty bids-closed line must name closed week history — not a generic closed lane"
+  if grep -qF 'Bids are closed.{" "}' src/components/board/leaderboard.tsx; then
+    fail "closed empty bids-closed line must not stay a generic Bids are closed"
+  fi
+  grep -q 'closed empty bids-closed line is closed week history' tests/rank.test.ts \
+    || fail "rank tests must cover closed empty bids-closed line as closed week history"
+  grep -q 'Bids are closed in closed week history' tests/period.test.ts \
+    || fail "period tests must name the closed empty bids-closed line as closed week history"
+  closed_empty_bids="$(awk '/Bids are closed/,/data-live-week/' src/components/board/leaderboard.tsx)"
+  echo "$closed_empty_bids" | grep -q 'Bids are closed in closed week history' \
+    || fail "closed empty bids-closed line arm must name closed week history"
+  if echo "$closed_empty_bids" | grep -qF 'Bids are closed.{" "}'; then
+    fail "closed empty bids-closed line must not stay a generic Bids are closed"
+  fi
+  if grep -nE 'data-closed-empty-bids|data-bids-closed-hop|data-closed-bids-hop|data-empty-history-bids' \
+    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "closed empty bids-closed line must not add a second named hop"
+  fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \
