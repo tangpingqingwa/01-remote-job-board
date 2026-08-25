@@ -44,7 +44,7 @@ export function Leaderboard({
           data-empty-closed="true"
           data-empty-honest=""
         >
-          <p className="empty-lane-kicker">Closed week</p>
+          <p className="empty-lane-kicker">Closed week history</p>
           <p>
             No listings this period in {laneLabel(lane)}. Rank is the bid. This
             lane was empty. Nobody is invented here.

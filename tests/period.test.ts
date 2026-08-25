@@ -388,7 +388,8 @@ test("closed-week board is read-only history of that period", () => {
   assert.match(html, /Closed week history 2026-W33 — read only/);
   assert.doesNotMatch(html, /Period 2026-W33\. Next reset/);
   assert.doesNotMatch(html, /Next reset 2026-08-24T00:00:00\.000Z/);
-  assert.match(html, /Closed week/);
+  assert.match(html, /class="empty-lane-kicker">Closed week history</);
+  assert.doesNotMatch(html, /class="empty-lane-kicker">Closed week</);
   assert.match(html, /Week 2026-W33 is read-only week history/);
   assert.doesNotMatch(
     html,

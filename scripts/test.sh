@@ -941,6 +941,19 @@ if [[ -f package.json ]]; then
     src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
     fail "closed empty period stamp must not add a second named hop"
   fi
+  grep -qF '<p className="empty-lane-kicker">Closed week history</p>' src/components/board/leaderboard.tsx \
+    || fail "closed empty kicker must name closed week history — not a generic Closed week"
+  if grep -qF '<p className="empty-lane-kicker">Closed week</p>' src/components/board/leaderboard.tsx; then
+    fail "closed empty kicker must not stay a generic Closed week"
+  fi
+  grep -q 'closed empty kicker is closed week history' tests/rank.test.ts \
+    || fail "rank tests must cover closed empty kicker as closed week history"
+  grep -qF 'class="empty-lane-kicker">Closed week history' tests/period.test.ts \
+    || fail "period tests must name the closed empty kicker as closed week history"
+  if grep -nE 'data-closed-empty-kicker|data-empty-kicker-hop|data-closed-kicker-hop|data-empty-history-kicker' \
+    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "closed empty kicker must not add a second named hop"
+  fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \
