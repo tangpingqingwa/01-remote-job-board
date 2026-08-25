@@ -93,8 +93,8 @@ export function BidForm({
         <p className="claim-note">
           {laneEmpty ? (
             <>
-              This week is empty. ${MIN_BID_USD} takes #1. Pick the function
-              after Claim #1. Nobody is invented here.
+              The last 7 days from paid placement are empty. ${MIN_BID_USD} takes
+              #1. Pick the function after Claim #1. Nobody is invented here.
             </>
           ) : (
             <>

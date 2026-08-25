@@ -121,7 +121,12 @@ test("unpaid stays off the hiring wall — No #1 until Polar reports paid", () =
   assert.match(unpaidHtml, /data-first-click="claim"/);
   assert.match(unpaidHtml, /Claim #1 for/);
   assert.match(unpaidHtml, /Claim #1, then pick the function/);
+  assert.match(unpaidHtml, /Rolling last 7 days from paid placement/);
+  assert.match(unpaidHtml, /data-empty-window=""/);
   assert.match(unpaidHtml, /<select[^>]*name="lane"/);
+  assert.doesNotMatch(unpaidHtml, /data-week-window/);
+  assert.doesNotMatch(unpaidHtml, /Period 2026-W34\. Next reset/);
+  assert.doesNotMatch(unpaidHtml, /This week/);
   assert.doesNotMatch(unpaidHtml, /data-listing-card/);
   assert.doesNotMatch(unpaidHtml, /data-prize-title/);
   assert.doesNotMatch(unpaidHtml, /data-prize-pack/);
@@ -3891,18 +3896,122 @@ test("occupied week window is rolling last 7 days from paid placement — not Mo
   assert.doesNotMatch(occupied, /data-list-after-apply-N|data-list-after-apply-eight/);
   assert.doesNotMatch(occupied, /data-first-click="claim"/);
 
-  assert.match(empty, /data-week-window="rolling-7d"/);
+  assert.match(empty, /data-empty-window=""/);
   assert.match(empty, /Rolling last 7 days from paid placement/);
+  assert.match(empty, /Not Monday 00:00 UTC/);
+  assert.match(empty, /This remote \(global\) wall is empty/);
   assert.match(empty, /Claim #1 for/);
   assert.match(empty, /data-first-click="claim"/);
   assert.match(empty, /Claim #1, then pick the function/);
   assert.match(empty, /<select[^>]*name="lane"/);
   assert.ok(empty.indexOf("Claim #1 for") < empty.indexOf('name="lane"'));
+  assert.doesNotMatch(empty, /data-week-window="rolling-7d"/);
+  assert.doesNotMatch(empty, /Week 2026-W34 is an audit label/);
+  assert.doesNotMatch(empty, /Period 2026-W34/);
+  assert.doesNotMatch(empty, /Next reset/);
+  assert.doesNotMatch(empty, /This week/);
   assert.doesNotMatch(empty, /wall-rail|wall-plate/);
   assert.doesNotMatch(empty, /data-first-click="apply"/);
   assert.doesNotMatch(empty, /data-list-after-apply-N/);
 
   assert.doesNotMatch(closed, /data-week-window="rolling-7d"/);
+  assert.doesNotMatch(closed, /data-empty-window/);
   assert.match(closed, /Closed week/);
   assert.match(closed, /wall-rail/);
+});
+
+test("empty wall copy is rolling last 7 days from paid placement — not Period/Next reset Monday 00:00 UTC", () => {
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: liveRankResetAt(
+        rankListings(specTieRows),
+        new Date("2026-08-17T14:00:00.000Z"),
+      ),
+      listings: rankListings(specTieRows),
+    }),
+  );
+  const closed = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+      live: false,
+    }),
+  );
+
+  const windowAt = empty.indexOf('data-empty-window=""');
+  const factAt = empty.indexOf("This remote (global) wall is empty");
+  const claimAt = empty.indexOf("Claim #1 for");
+  const firstClickAt = empty.indexOf('data-first-click="claim"');
+  const laneAt = empty.indexOf('name="lane"');
+  assert.ok(windowAt >= 0 && factAt > windowAt);
+  assert.ok(claimAt > factAt && firstClickAt > claimAt && laneAt > firstClickAt);
+
+  assert.match(empty, /data-period-live="true"/);
+  assert.match(empty, /data-empty-window=""/);
+  assert.match(empty, /Rolling last 7 days from paid placement/);
+  assert.match(empty, /Not Monday 00:00 UTC/);
+  assert.match(empty, /This remote \(global\) wall is empty/);
+  assert.match(empty, /Rank is the bid/);
+  assert.match(empty, /Claim #1, then pick the function/);
+  assert.match(empty, /The last 7 days from paid placement are empty/);
+  assert.match(empty, /\$5 takes #1/);
+  assert.match(empty, /Claim #1 for/);
+  assert.match(empty, /data-first-click="claim"/);
+  assert.match(empty, />Outbid</);
+  assert.match(empty, /<select[^>]*name="lane"/);
+  assert.doesNotMatch(empty, /data-week-window/);
+  assert.doesNotMatch(empty, /Week 2026-W34 is an audit label/);
+  assert.doesNotMatch(empty, /Period 2026-W34\. Next reset/);
+  assert.doesNotMatch(empty, /Next reset 2026-08-24T00:00:00\.000Z/);
+  assert.doesNotMatch(empty, /This week/);
+  assert.doesNotMatch(empty, /This week is empty/);
+  assert.doesNotMatch(empty, /24h lock/);
+  assert.doesNotMatch(empty, /data-first-click="apply"/);
+  assert.doesNotMatch(empty, />Apply</);
+  assert.doesNotMatch(empty, /data-list-after-apply-N|data-list-after-apply-eight/);
+  assert.doesNotMatch(empty, /wall-rail|wall-plate/);
+
+  assert.match(occupied, /data-week-window="rolling-7d"/);
+  assert.match(occupied, /Rolling last 7 days from paid placement/);
+  assert.match(occupied, /Week 2026-W34 is an audit label/);
+  assert.match(occupied, /This week/);
+  assert.match(occupied, /remote \(global\) Backend wall/);
+  assert.match(occupied, /data-first-click="apply"/);
+  assert.match(occupied, />Apply</);
+  assert.doesNotMatch(occupied, /data-empty-window/);
+  assert.doesNotMatch(occupied, /This remote \(global\) wall is empty/);
+  assert.doesNotMatch(occupied, /Not Monday 00:00 UTC/);
+  assert.doesNotMatch(occupied, /data-first-click="claim"/);
+
+  assert.match(closed, /Period 2026-W33\. Next reset 2026-08-24T00:00:00\.000Z/);
+  assert.match(closed, /Closed week — read only/);
+  assert.match(closed, /data-empty-closed="true"/);
+  assert.match(closed, /Bids are closed/);
+  assert.doesNotMatch(closed, /data-week-window="rolling-7d"/);
+  assert.doesNotMatch(closed, /data-empty-window/);
+  assert.doesNotMatch(closed, /Claim #1 for/);
+  assert.doesNotMatch(closed, /data-bid-form/);
+
+  assert.match(formSource, /The last 7 days from paid placement are empty/);
+  assert.doesNotMatch(formSource, /This week is empty/);
+  assert.match(
+    cssSource,
+    /\.hiring-wall \.period-meta\[data-empty-window\]\[data-week-window\]/,
+  );
+  assert.match(
+    cssSource,
+    /\.hiring-wall \.wall-mast:has\(\[data-empty-window\]\) \.period-meta\[data-week-window\]/,
+  );
 });

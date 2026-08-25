@@ -217,6 +217,12 @@ a:hover {
   text-transform: uppercase;
 }
 
+/* Occupied rolling chrome (week-window stamp) stays off the empty live wall. */
+.hiring-wall .period-meta[data-empty-window][data-week-window],
+.hiring-wall .wall-mast:has([data-empty-window]) .period-meta[data-week-window] {
+  display: none;
+}
+
 .wall-lane-name {
   margin: 0;
   font-family: var(--mono);

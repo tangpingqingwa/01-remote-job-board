@@ -768,8 +768,19 @@ if [[ -f package.json ]]; then
     || fail "live board must load rolling last-7-days occupancy"
   grep -q 'liveRankResetAt' src/app/page.tsx \
     || fail "live board must reset from paid placement, not Monday 00:00 UTC"
-  grep -q 'data-week-window={live ? "rolling-7d"' src/components/board/board.tsx \
-    || fail "live wall must stamp the rolling last-7-days window"
+  grep -q 'data-week-window={occupiedLive ? "rolling-7d"' src/components/board/board.tsx \
+    || fail "occupied live wall must stamp the rolling last-7-days window"
+  grep -q 'data-empty-window' src/components/board/board.tsx \
+    || fail "empty live wall must name its own rolling window, not occupied week-window chrome"
+  grep -q 'Rolling last 7 days from paid placement. Not Monday 00:00 UTC.' src/components/board/board.tsx \
+    || fail "empty live wall must name rolling last 7 days and drop Monday 00:00 UTC"
+  grep -q 'This remote (global) wall is empty' src/components/board/board.tsx \
+    || fail "empty live wall must drop This week's remote wall Monday copy"
+  grep -q 'The last 7 days from paid placement are empty' src/components/board/bid-form.tsx \
+    || fail "empty claim note must name last 7 days from paid placement"
+  if grep -nE 'This week is empty' src/components/board/bid-form.tsx >/dev/null; then
+    fail "empty claim note must not say This week is empty"
+  fi
   grep -q 'Rolling last 7 days from paid placement' src/components/board/board.tsx \
     || fail "live wall must say rolling last 7 days from paid placement"
   grep -q 'audit label' src/components/board/board.tsx \
@@ -800,6 +811,10 @@ if [[ -f package.json ]]; then
     || fail "rank tests must cover occupied rolling last-7-days composition"
   grep -q 'occupied week window is rolling last 7 days' tests/rank.test.ts \
     || fail "rank tests must cover occupied rolling last-7-days week window"
+  grep -q 'empty wall copy is rolling last 7 days' tests/rank.test.ts \
+    || fail "rank tests must cover empty rolling last-7-days copy"
+  grep -q 'data-empty-window=""' tests/rank.test.ts \
+    || fail "rank tests must stamp empty window copy without occupied week-window chrome"
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \
