@@ -403,7 +403,8 @@ test("closed-week board is read-only history of that period", () => {
   assert.match(html, /period=2026-W33/);
   assert.match(html, /data-empty-closed="true"/);
   assert.match(html, /data-empty-honest=""/);
-  assert.match(html, /Bids are closed/);
+  assert.match(html, /Bids are closed in closed week history/);
+  assert.doesNotMatch(html, /Bids are closed\./);
   assert.match(html, /No listings in closed week history/);
   assert.match(html, /Closed week history was empty/);
   assert.doesNotMatch(html, /This lane was empty/);
@@ -594,7 +595,8 @@ test("closed-week unpaid rows stay off the wall — no invented occupancy", () =
   );
   assert.match(html, /data-empty-closed="true"/);
   assert.match(html, /data-empty-honest=""/);
-  assert.match(html, /Bids are closed/);
+  assert.match(html, /Bids are closed in closed week history/);
+  assert.doesNotMatch(html, /Bids are closed\./);
   assert.match(
     html,
     /Open the live Backend wall for the rolling last 7 days from paid placement/,
