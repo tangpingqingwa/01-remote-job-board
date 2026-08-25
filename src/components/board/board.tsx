@@ -28,7 +28,9 @@ export function Board({
   const emptyFirst = live && laneEmpty;
   const occupiedLive = live && !laneEmpty;
   const closedEmpty = !live && laneEmpty;
-  const functionRailName = closedEmpty ? "Closed week history" : "Function lanes";
+  const closedOccupied = !live && !laneEmpty;
+  const functionRailName =
+    closedEmpty || closedOccupied ? "Closed week history" : "Function lanes";
   const claimForm = live ? (
     <BidForm
       lane={lane}

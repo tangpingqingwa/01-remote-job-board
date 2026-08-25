@@ -535,9 +535,15 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.doesNotMatch(html, /<select[^>]*name="lane"/);
   assert.match(html, /wall-rail/);
   assert.match(html, /wall-plate/);
-  assert.match(html, /class="wall-rail-kicker">Function lanes</);
-  assert.match(html, /aria-label="Function lanes"/);
-  assert.doesNotMatch(html, /class="wall-rail-kicker">Closed week history</);
+  assert.ok(
+    html.indexOf('class="wall-rail-kicker">Closed week history') >= 0,
+    "closed occupied function-rail must name closed week history, not generic Function lanes",
+  );
+  assert.match(html, /class="wall-rail-kicker">Closed week history</);
+  assert.match(html, /aria-label="Closed week history"/);
+  assert.doesNotMatch(html, /class="wall-rail-kicker">Function lanes</);
+  assert.doesNotMatch(html, /aria-label="Function lanes"/);
+  assert.doesNotMatch(html, /Function lanes/);
   assert.ok(html.indexOf("wall-rail") < html.indexOf("data-prize-title"));
   assert.ok(html.indexOf("wall-rail") < html.indexOf(">Apply<"));
   assert.doesNotMatch(html, /data-one-identity/);

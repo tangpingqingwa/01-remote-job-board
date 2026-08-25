@@ -999,7 +999,7 @@ if [[ -f package.json ]]; then
     src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "closed empty bids-closed line must not add a second named hop"
   fi
-  grep -q 'closedEmpty ? "Closed week history" : "Function lanes"' src/components/board/board.tsx \
+  grep -q 'closedEmpty || closedOccupied ? "Closed week history" : "Function lanes"' src/components/board/board.tsx \
     || fail "closed empty function-rail must name closed week history — not generic Function lanes"
   if grep -q 'className="wall-rail-kicker">Function lanes' src/components/board/board.tsx; then
     fail "closed empty function-rail must not stay generic Function lanes"
@@ -1019,6 +1019,26 @@ if [[ -f package.json ]]; then
   if grep -nE 'data-closed-empty-rail|data-function-rail-hop|data-closed-rail-hop|data-empty-history-rail' \
     src/components/board/board.tsx src/components/board/lane-tabs.tsx src/app/globals.css >/dev/null; then
     fail "closed empty function-rail must not add a second named hop"
+  fi
+  grep -q 'closedEmpty || closedOccupied ? "Closed week history" : "Function lanes"' src/components/board/board.tsx \
+    || fail "closed occupied function-rail must name closed week history — not generic Function lanes"
+  grep -q 'const closedOccupied = !live && !laneEmpty' src/components/board/board.tsx \
+    || fail "closed occupied function-rail must have a closed occupied arm"
+  grep -q 'closed occupied function-rail is closed week history' tests/rank.test.ts \
+    || fail "rank tests must cover closed occupied function-rail as closed week history"
+  grep -q 'closed occupied function-rail must name closed week history, not generic Function lanes' tests/period.test.ts \
+    || fail "period tests must name the closed occupied function-rail as closed week history"
+  closed_occupied_rail="$(awk '/functionRailName/,/LaneTabs/' src/components/board/board.tsx)"
+  echo "$closed_occupied_rail" | grep -q 'closedOccupied' \
+    || fail "closed occupied function-rail arm must name closed occupied"
+  echo "$closed_occupied_rail" | grep -q 'Closed week history' \
+    || fail "closed occupied function-rail arm must name closed week history"
+  if echo "$closed_occupied_rail" | grep -q 'className="wall-rail-kicker">Function lanes'; then
+    fail "closed occupied function-rail must not stay generic Function lanes"
+  fi
+  if grep -nE 'data-closed-occupied-rail|data-occupied-function-rail-hop|data-closed-occupied-rail-hop|data-occupied-history-rail' \
+    src/components/board/board.tsx src/components/board/lane-tabs.tsx src/app/globals.css >/dev/null; then
+    fail "closed occupied function-rail must not add a second named hop"
   fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
