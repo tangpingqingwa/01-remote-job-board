@@ -108,7 +108,7 @@ if [[ -f package.json ]]; then
   grep -q 'Bids are closed' src/components/board/leaderboard.tsx \
     || fail "closed empty week must say bids are closed"
   grep -q 'data-live-week' src/components/board/leaderboard.tsx \
-    || fail "closed empty week must point at this week's live wall"
+    || fail "closed empty week must point at the live wall"
   grep -q 'MIN_BID_USD} takes' src/components/board/bid-form.tsx \
     || fail "empty claim box must say \$5 takes #1"
   grep -q 'Claim #1 for' src/components/board/bid-form.tsx \
@@ -839,6 +839,19 @@ if [[ -f package.json ]]; then
   if grep -nE 'data-rolling-prize|data-rolling-later|data-occupied-label-hop|data-prize-window-hop' \
     src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "occupied prize/later labels must not add a second named hop"
+  fi
+  grep -q 'Open the live {laneLabel(lane)} wall for the rolling last 7 days from paid placement' src/components/board/leaderboard.tsx \
+    || fail "closed empty live-pointer must name rolling last 7 days from paid placement — not this week's live wall"
+  grep -q 'closed empty live-pointer is rolling last 7 days' tests/rank.test.ts \
+    || fail "rank tests must cover closed empty live-pointer rolling last-7-days copy"
+  grep -q 'Open the live Backend wall for the rolling last 7 days from paid placement' tests/period.test.ts \
+    || fail "period tests must point closed empty at the rolling last-7-days live wall"
+  if grep -A2 'data-live-week' src/components/board/leaderboard.tsx | grep -q "this week"; then
+    fail "closed empty live-pointer must not point at this week's live wall"
+  fi
+  if grep -nE 'data-closed-live-pointer|data-live-pointer-hop|data-rolling-pointer|data-live-week-hop' \
+    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "closed empty live-pointer must not add a second named hop"
   fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
