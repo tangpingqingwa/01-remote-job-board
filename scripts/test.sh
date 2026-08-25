@@ -822,6 +822,24 @@ if [[ -f package.json ]]; then
   if grep -nE "occupiedLive \?" src/components/board/board.tsx | grep -q "This week"; then
     fail "occupied live fact must not print This week's remote wall"
   fi
+  grep -q 'Rolling last 7 days #1' src/components/board/leaderboard.tsx \
+    || fail "occupied live prize pack must name rolling last 7 days — not This week's #1"
+  grep -q 'Later ranks in the rolling last 7 days' src/components/board/leaderboard.tsx \
+    || fail "occupied live later pack must name the same rolling last-7-days window as the fact"
+  grep -q "This week's #1" src/components/board/leaderboard.tsx \
+    || fail "closed-week prize pack must keep This week's #1"
+  grep -q 'Later ranks this week' src/components/board/leaderboard.tsx \
+    || fail "closed-week later pack must keep Later ranks this week"
+  grep -q 'occupied prize/later labels are rolling last 7 days' tests/rank.test.ts \
+    || fail "rank tests must cover occupied prize/later rolling last-7-days labels"
+  grep -q 'Rolling last 7 days #1' tests/period.test.ts \
+    || fail "period tests must keep occupied live prize labels on the rolling window"
+  grep -q 'Later ranks this week' tests/period.test.ts \
+    || fail "period tests must keep closed-week later labels as Later ranks this week"
+  if grep -nE 'data-rolling-prize|data-rolling-later|data-occupied-label-hop|data-prize-window-hop' \
+    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "occupied prize/later labels must not add a second named hop"
+  fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \

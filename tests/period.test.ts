@@ -153,7 +153,10 @@ test("live rank is rolling last 7 days from paid placement — not Monday 00:00 
     occupied,
     /This remote \(global\) Backend wall is the rolling last 7 days from paid placement/,
   );
+  assert.match(occupied, /aria-label="Rolling last 7 days #1"/);
   assert.doesNotMatch(occupied, /This week(?:'|&#x27;|&apos;)s remote \(global\)/);
+  assert.doesNotMatch(occupied, /This week(?:'|&#x27;|&apos;)s #1/);
+  assert.doesNotMatch(occupied, /Later ranks this week/);
   assert.match(occupied, /2026-08-23T23:00:00.000Z/);
   assert.doesNotMatch(occupied, /2026-08-17T00:00:00.000Z/);
   assert.match(occupied, /data-prize-title=""/);
@@ -471,7 +474,11 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.match(html, /data-period-live="false"/);
   assert.match(html, /Closed week/);
   assert.match(html, /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/);
+  assert.match(html, /aria-label="This week(?:'|&#x27;|&apos;)s #1"/);
+  assert.match(html, /aria-label="Later ranks this week"/);
   assert.doesNotMatch(html, /wall is the rolling last 7 days from paid placement/);
+  assert.doesNotMatch(html, /aria-label="Rolling last 7 days #1"/);
+  assert.doesNotMatch(html, /Later ranks in the rolling last 7 days/);
   assert.match(html, /data-listing-card/);
   assert.match(html, /\$21/);
   assert.match(html, />Apply</);
