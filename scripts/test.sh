@@ -999,6 +999,27 @@ if [[ -f package.json ]]; then
     src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "closed empty bids-closed line must not add a second named hop"
   fi
+  grep -q 'closedEmpty ? "Closed week history" : "Function lanes"' src/components/board/board.tsx \
+    || fail "closed empty function-rail must name closed week history — not generic Function lanes"
+  if grep -q 'className="wall-rail-kicker">Function lanes' src/components/board/board.tsx; then
+    fail "closed empty function-rail must not stay generic Function lanes"
+  fi
+  grep -q 'closed empty function-rail is closed week history' tests/rank.test.ts \
+    || fail "rank tests must cover closed empty function-rail as closed week history"
+  grep -q 'class="wall-rail-kicker">Closed week history' tests/period.test.ts \
+    || fail "period tests must name the closed empty function-rail as closed week history"
+  grep -q 'aria-label="Closed week history"' tests/period.test.ts \
+    || fail "period tests must name the closed empty function-rail aria as closed week history"
+  closed_empty_rail="$(awk '/functionRailName/,/LaneTabs/' src/components/board/board.tsx)"
+  echo "$closed_empty_rail" | grep -q 'Closed week history' \
+    || fail "closed empty function-rail arm must name closed week history"
+  if echo "$closed_empty_rail" | grep -q 'className="wall-rail-kicker">Function lanes'; then
+    fail "closed empty function-rail must not stay generic Function lanes"
+  fi
+  if grep -nE 'data-closed-empty-rail|data-function-rail-hop|data-closed-rail-hop|data-empty-history-rail' \
+    src/components/board/board.tsx src/components/board/lane-tabs.tsx src/app/globals.css >/dev/null; then
+    fail "closed empty function-rail must not add a second named hop"
+  fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \

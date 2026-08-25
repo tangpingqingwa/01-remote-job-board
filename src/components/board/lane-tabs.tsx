@@ -5,12 +5,14 @@ import { FUNCTION_LANES } from "../../lib/types";
 export function LaneTabs({
   lane,
   periodId,
+  label = "Function lanes",
 }: {
   lane: FunctionLane;
   periodId?: string;
+  label?: string;
 }) {
   return (
-    <nav className="lane-tabs" aria-label="Function lanes" data-lane-tabs="">
+    <nav className="lane-tabs" aria-label={label} data-lane-tabs="">
       {FUNCTION_LANES.map((item) => {
         const current = item === lane;
         const href = periodId
