@@ -58,16 +58,19 @@ export function Board({
           <p
             className="period-meta"
             data-period={periodId}
-            data-week-window={live ? "rolling-7d" : undefined}
+            data-week-window={occupiedLive ? "rolling-7d" : undefined}
+            {...(emptyFirst ? { "data-empty-window": "" } : {})}
           >
-            {live
+            {occupiedLive
               ? `Rolling last 7 days from paid placement. Week ${periodId} is an audit label. Next reset ${nextResetAt}.`
-              : `Period ${periodId}. Next reset ${nextResetAt}. Closed week — read only.`}
+              : emptyFirst
+                ? "Rolling last 7 days from paid placement. Not Monday 00:00 UTC."
+                : `Period ${periodId}. Next reset ${nextResetAt}. Closed week — read only.`}
           </p>
           {emptyFirst ? (
             <p className="wall-lane-fact">
-              This week&apos;s remote (global) wall is empty. Rank is the bid.
-              Claim #1, then pick the function.
+              This remote (global) wall is empty. Rank is the bid. Claim #1,
+              then pick the function.
             </p>
           ) : (
             <>
