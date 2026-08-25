@@ -404,7 +404,10 @@ test("closed-week board is read-only history of that period", () => {
   assert.match(html, /data-empty-closed="true"/);
   assert.match(html, /data-empty-honest=""/);
   assert.match(html, /Bids are closed/);
-  assert.match(html, /This lane was empty/);
+  assert.match(html, /No listings in closed week history/);
+  assert.match(html, /Closed week history was empty/);
+  assert.doesNotMatch(html, /This lane was empty/);
+  assert.doesNotMatch(html, /No listings this period/);
   assert.match(html, /data-live-week=""/);
   assert.match(html, /href="\/\?lane=backend"/);
   assert.match(

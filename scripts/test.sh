@@ -954,6 +954,32 @@ if [[ -f package.json ]]; then
     src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "closed empty kicker must not add a second named hop"
   fi
+  grep -q 'No listings in closed week history' src/components/board/leaderboard.tsx \
+    || fail "closed empty body must name closed week history — not a generic empty lane"
+  grep -q 'Closed week history was empty' src/components/board/leaderboard.tsx \
+    || fail "closed empty body must say closed week history was empty — not This lane was empty"
+  if grep -q 'This lane was empty' src/components/board/leaderboard.tsx; then
+    fail "closed empty body must not stay This lane was empty"
+  fi
+  grep -q 'closed empty body is closed week history' tests/rank.test.ts \
+    || fail "rank tests must cover closed empty body as closed week history"
+  grep -q 'No listings in closed week history' tests/period.test.ts \
+    || fail "period tests must name the closed empty body as closed week history"
+  closed_empty_body="$(awk '/if \(closed\) \{/,/Bids are closed/' src/components/board/leaderboard.tsx)"
+  echo "$closed_empty_body" | grep -q 'No listings in closed week history' \
+    || fail "closed empty body arm must name closed week history"
+  echo "$closed_empty_body" | grep -q 'Closed week history was empty' \
+    || fail "closed empty body arm must say closed week history was empty"
+  if echo "$closed_empty_body" | grep -q 'This lane was empty'; then
+    fail "closed empty body must not stay This lane was empty"
+  fi
+  if echo "$closed_empty_body" | grep -q 'No listings this period'; then
+    fail "closed empty body must not stay No listings this period"
+  fi
+  if grep -nE 'data-closed-empty-body|data-empty-body-hop|data-closed-body-hop|data-empty-history-body' \
+    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "closed empty body must not add a second named hop"
+  fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \
