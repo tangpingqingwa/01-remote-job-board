@@ -46,7 +46,7 @@ export function Board({
         lane={lane}
         periodId={live ? undefined : periodId}
         label={functionRailName}
-        weekHistory={closedOccupied}
+        weekHistory={closedOccupied || closedEmpty}
       />
     </>
   );

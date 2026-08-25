@@ -463,6 +463,14 @@ test("closed-week board is read-only history of that period", () => {
   assert.match(html, /wall-plate/);
   assert.match(html, /class="wall-rail-kicker">Closed week history</);
   assert.match(html, /aria-label="Closed week history"/);
+  assert.ok(
+    html.indexOf(">Backend week history<") >= 0,
+    "closed empty function plates must name closed week history, not live Function lanes",
+  );
+  assert.match(html, /data-lane="backend"[^>]*>Backend week history</);
+  assert.match(html, /data-lane="founding"[^>]*>Founding week history</);
+  assert.equal((html.match(/week history<\/a>/g) ?? []).length, 8);
+  assert.doesNotMatch(html, /data-lane="backend"[^>]*>Backend</);
   assert.doesNotMatch(html, /class="wall-rail-kicker">Function lanes</);
   assert.doesNotMatch(html, /aria-label="Function lanes"/);
   assert.doesNotMatch(html, /Function lanes/);
