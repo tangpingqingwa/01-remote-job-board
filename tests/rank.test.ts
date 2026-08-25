@@ -4015,3 +4015,117 @@ test("empty wall copy is rolling last 7 days from paid placement — not Period/
     /\.hiring-wall \.wall-mast:has\(\[data-empty-window\]\) \.period-meta\[data-week-window\]/,
   );
 });
+
+test("occupied live fact is rolling last 7 days from paid placement — not This week's remote wall", () => {
+  const listings = rankListings(specTieRows);
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: liveRankResetAt(listings, new Date("2026-08-17T14:00:00.000Z")),
+      listings,
+    }),
+  );
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const closed = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+      live: false,
+    }),
+  );
+  const unpaidHtml = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T14:00:00.000Z",
+      listings: rankListings([
+        fixtureListing({
+          id: "lst_unpaid_fact",
+          company: "Ghost",
+          title: "Unpaid Staff Engineer",
+          bidUsd: 50_000,
+          paidUsd: 0,
+          clicks: 99,
+          createdAt: "2026-08-17T08:00:00.000Z",
+        }),
+      ]),
+    }),
+  );
+
+  const windowAt = occupied.indexOf('data-week-window="rolling-7d"');
+  const factAt = occupied.indexOf(
+    "This remote (global) Backend wall is the rolling last 7 days from paid placement",
+  );
+  const applyAt = occupied.indexOf('data-first-click="apply"');
+  const platesAt = occupied.indexOf("wall-plate");
+  const listAt = occupied.indexOf('data-list-role="employer"');
+  assert.ok(windowAt >= 0);
+  assert.ok(
+    factAt >= 0,
+    "occupied live fact must be one contiguous rolling last-7-days line",
+  );
+  assert.ok(factAt > windowAt);
+  assert.ok(applyAt > factAt && platesAt > applyAt && listAt > platesAt);
+
+  assert.match(occupied, /data-week-window="rolling-7d"/);
+  assert.match(
+    occupied,
+    /Rolling last 7 days from paid placement\. Week 2026-W34 is an audit label/,
+  );
+  assert.match(
+    occupied,
+    /This remote \(global\) Backend wall is the rolling last 7 days from paid placement/,
+  );
+  assert.match(occupied, /Rank is the bid/);
+  assert.match(occupied, /data-prize-title=""/);
+  assert.match(occupied, /Staff Backend Engineer/);
+  assert.match(occupied, /data-first-click="apply"/);
+  assert.match(occupied, />Apply</);
+  assert.match(occupied, /\$21/);
+  assert.match(occupied, /9 clicks/);
+  assert.match(occupied, />Outbid</);
+  assert.match(occupied, /Claim #1 for/);
+  assert.match(occupied, /amount-field/);
+  assert.doesNotMatch(occupied, /This week(?:'|&#x27;|&apos;)s remote \(global\)/);
+  assert.doesNotMatch(occupied, /data-empty-window/);
+  assert.doesNotMatch(occupied, /This remote \(global\) wall is empty/);
+  assert.doesNotMatch(occupied, /Not Monday 00:00 UTC/);
+  assert.doesNotMatch(occupied, /data-first-click="claim"/);
+  assert.doesNotMatch(occupied, /class="wall-rail"/);
+  assert.doesNotMatch(occupied, /data-list-after-apply-N|data-list-after-apply-eight/);
+  assert.doesNotMatch(
+    occupied,
+    /data-occupied-fact-hop|data-live-fact-hop|data-rolling-fact-hop/,
+  );
+
+  assert.match(empty, /data-empty-window=""/);
+  assert.match(empty, /This remote \(global\) wall is empty/);
+  assert.match(empty, /Not Monday 00:00 UTC/);
+  assert.match(empty, /Claim #1, then pick the function/);
+  assert.doesNotMatch(empty, /data-week-window/);
+  assert.doesNotMatch(empty, /This week/);
+  assert.doesNotMatch(empty, /wall is the rolling last 7 days from paid placement/);
+
+  assert.match(closed, /Closed week — read only/);
+  assert.match(closed, /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/);
+  assert.doesNotMatch(closed, /data-week-window="rolling-7d"/);
+  assert.doesNotMatch(closed, /wall is the rolling last 7 days from paid placement/);
+  assert.doesNotMatch(closed, /data-bid-form/);
+  assert.doesNotMatch(closed, />Outbid</);
+  assert.match(closed, /wall-rail/);
+
+  assert.match(unpaidHtml, /data-empty-window=""/);
+  assert.doesNotMatch(unpaidHtml, /Ghost|Unpaid Staff Engineer/);
+  assert.doesNotMatch(unpaidHtml, /data-week-window/);
+  assert.doesNotMatch(unpaidHtml, /data-listing-card/);
+});
