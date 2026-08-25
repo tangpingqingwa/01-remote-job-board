@@ -1,4 +1,3 @@
-import { currentPeriodId } from "./period";
 import { paidListings } from "./rank";
 import { defaultBoardStore } from "./store";
 import type { FunctionLane, Listing } from "./types";
@@ -7,7 +6,10 @@ import { FUNCTION_LANES } from "./types";
 export {
   currentPeriodMeta,
   isoWeekPeriodId,
+  liveRankResetAt,
   nextMondayUtc,
+  placementExpiresAt,
+  ROLLING_WEEK_MS,
   type PeriodMeta,
 } from "./period";
 
@@ -38,10 +40,10 @@ export function getBoardListings(
   return paidListings(defaultBoardStore.listPaid(lane, periodId));
 }
 
-/** Live query: only the current `periodId` for `now`. Prior weeks are history. */
+/** Live query: paid placements in the rolling last 7 days. weekId is audit only. */
 export function getLiveBoardListings(
   lane: FunctionLane,
   now: Date = new Date(),
 ): Listing[] {
-  return getBoardListings(lane, currentPeriodId(now));
+  return paidListings(defaultBoardStore.listPaidRolling(lane, now));
 }

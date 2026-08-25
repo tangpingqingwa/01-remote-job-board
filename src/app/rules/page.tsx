@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Rules · Remote Job Board",
   description:
-    "Rank is the bid. Min $5, max $50,000. Weekly UTC reset. No invented salaries. Global remote.",
+    "Rank is the bid. Min $5, max $50,000. Rolling last 7 days from paid placement. No invented salaries. Global remote.",
 };
 
 export default function RulesPage() {
@@ -58,16 +58,19 @@ export default function RulesPage() {
           <tr>
             <th>Identity</th>
             <td>
-              A listing is keyed by <code>(periodId, lane, identity)</code>.{" "}
-              <code>identity</code> is the canonical apply URL when present,
-              else the company handle.
+              A live listing is keyed by <code>(lane, identity)</code> in the
+              rolling last 7 days. <code>identity</code> is the canonical apply
+              URL when present, else the company handle.{" "}
+              <code>periodId</code> is an audit label, not the live key (
+              <code>periodId, lane, identity</code> stays history).
             </td>
           </tr>
           <tr>
             <th>Raise</th>
             <td>
               Submitting the same apply URL or the same company handle in the
-              same lane + period updates that listing. New bid must be{" "}
+              same lane while that listing is still in the rolling last 7 days
+              updates that listing. New bid must be{" "}
               <strong>≥ current bid + 1</strong>. Payer pays{" "}
               <strong>newBid − currentBid</strong> only.
             </td>
@@ -94,9 +97,11 @@ export default function RulesPage() {
           <tr>
             <th>Period</th>
             <td>
-              Rankings are computed only among listings in the{" "}
-              <strong>current</strong> period for that lane. Prior periods are
-              history, not the live board.
+              Live rank is computed among paid listings whose{" "}
+              <code>createdAt</code> (paid placement) falls in the{" "}
+              <strong>rolling last 7 days</strong>. ISO <code>periodId</code>{" "}
+              is an audit label. Closed weekIds remain history, not the live
+              board.
             </td>
           </tr>
           <tr>
@@ -128,17 +133,22 @@ export default function RulesPage() {
         </li>
       </ol>
 
-      <h2>Weekly UTC reset</h2>
+      <h2>Rolling 7-day window</h2>
       <table>
         <tbody>
           <tr>
             <th>Period length</th>
-            <td>7 days. Default is a weekly reset per function lane.</td>
+            <td>
+              7 days from paid placement. Not a 24h lock on #1. Default is a{" "}
+              weekly reset length per function lane.
+            </td>
           </tr>
           <tr>
             <th>Boundary</th>
             <td>
-              <strong>Monday 00:00:00.000 UTC</strong>
+              <strong>Rolling last 7 days from paid placement</strong>. Not{" "}
+              <strong>Monday 00:00:00.000 UTC</strong> as the live rank
+              boundary. Monday 00:00:00.000 UTC only opens a new audit weekId.
             </td>
           </tr>
           <tr>
@@ -147,18 +157,21 @@ export default function RulesPage() {
             </th>
             <td>
               ISO week in UTC, <code>YYYY-Www</code> (e.g. <code>2026-W34</code>
-              ).
+              ). Audit label only.
             </td>
           </tr>
           <tr>
-            <th>What resets</th>
-            <td>Live rank, bids, and click counters for the new period.</td>
+            <th>What ages out</th>
+            <td>
+              A listing leaves live rank 7 days after paid placement. Rank
+              among remaining paid rows is still the bid.
+            </td>
           </tr>
           <tr>
             <th>What does not carry</th>
             <td>
-              Previous period bid amounts. A company that wants #1 next week
-              pays again.
+              An expired placement. A company that wants #1 again pays a new
+              listing (full bid) — it pays again.
             </td>
           </tr>
           <tr>
@@ -172,9 +185,10 @@ export default function RulesPage() {
         </tbody>
       </table>
       <p>
-        The board header shows the current period and the UTC instant of the
-        next reset. Daily mode (<code>CADENCE=daily</code>) is a documented
-        future flag. v1 ships weekly.
+        The occupied board header shows the rolling last 7 days from paid
+        placement, the weekId as an audit label, and the UTC instant the
+        current #1 placement expires. Daily mode (<code>CADENCE=daily</code>) is
+        a documented future flag. v1 ships the 7-day rolling window.
       </p>
 
       <h2>Listings</h2>
@@ -227,8 +241,9 @@ export default function RulesPage() {
         </li>
         <li>
           Identity collision: same canonical apply URL or same company handle
-          in the same <code>(periodId, lane)</code> is a <strong>raise</strong>{" "}
-          of that listing, not a second card.
+          in the rolling last 7 days is a <strong>raise</strong> of that
+          listing, not a second card. <code>periodId</code> stays an audit
+          label.
         </li>
       </ol>
       <p>

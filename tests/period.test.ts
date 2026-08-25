@@ -15,8 +15,13 @@ import {
   currentPeriodMeta,
   isoWeekPeriodId,
   isClosedPeriod,
+  isInRollingWeek,
+  liveRankResetAt,
   nextMondayUtc,
+  placementExpiresAt,
   resolveBoardPeriod,
+  rollingWeekStart,
+  ROLLING_WEEK_MS,
 } from "../src/lib/period";
 import { rankListings } from "../src/lib/rank";
 import { defaultBoardStore } from "../src/lib/store";
@@ -45,6 +50,7 @@ test("Monday 00:00 UTC is included in the new ISO week", () => {
     cadence: "weekly",
     live: true,
   });
+  assert.equal(ROLLING_WEEK_MS, 7 * 86_400_000);
 });
 
 test("Sunday still belongs to the previous ISO week", () => {
@@ -65,7 +71,7 @@ test("ISO year can differ from the calendar year near 1 January", () => {
   assert.equal(isoWeekPeriodId(new Date("2027-01-04T00:00:00.000Z")), "2027-W01");
 });
 
-test("injected clock rolls the week and live query drops old bids", () => {
+test("injected clock keeps Sunday occupancy through Monday 00:00 UTC", () => {
   seedPaid({
     id: "lst_old",
     company: "Acme",
@@ -87,10 +93,114 @@ test("injected clock rolls the week and live query drops old bids", () => {
   );
   assert.deepEqual(
     getLiveBoardListings("backend", MONDAY).map((row) => row.id),
-    ["lst_live"],
+    ["lst_old"],
+  );
+  assert.deepEqual(
+    getLiveBoardListings("backend", new Date("2026-08-17T10:00:00.000Z")).map(
+      (row) => row.id,
+    ),
+    ["lst_old", "lst_live"],
   );
   assert.deepEqual(getBoardListings("backend", WEEK_33).map((row) => row.id), [
     "lst_old",
+  ]);
+});
+
+test("live rank is rolling last 7 days from paid placement — not Monday 00:00 UTC", () => {
+  seedPaid({
+    id: "lst_sunday",
+    company: "Acme",
+    title: "Staff Backend Engineer",
+    bidUsd: 21,
+    periodId: WEEK_33,
+    createdAt: "2026-08-16T23:00:00.000Z",
+  });
+  const mondayMorning = new Date("2026-08-17T00:01:00.000Z");
+  const still = getLiveBoardListings("backend", mondayMorning);
+  assert.deepEqual(still.map((row) => row.id), ["lst_sunday"]);
+  assert.equal(isoWeekPeriodId(mondayMorning), WEEK_34);
+  assert.equal(still[0]?.periodId, WEEK_33);
+  assert.equal(
+    placementExpiresAt("2026-08-16T23:00:00.000Z"),
+    "2026-08-23T23:00:00.000Z",
+  );
+  assert.equal(
+    liveRankResetAt(still, mondayMorning),
+    "2026-08-23T23:00:00.000Z",
+  );
+  assert.notEqual(
+    liveRankResetAt(still, mondayMorning),
+    nextMondayUtc(mondayMorning).toISOString(),
+  );
+  assert.ok(isInRollingWeek("2026-08-16T23:00:00.000Z", mondayMorning));
+  assert.equal(
+    rollingWeekStart(mondayMorning).toISOString(),
+    "2026-08-10T00:01:00.000Z",
+  );
+
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: WEEK_34,
+      nextResetAt: liveRankResetAt(still, mondayMorning),
+      listings: rankListings(still),
+    }),
+  );
+  assert.match(occupied, /data-week-window="rolling-7d"/);
+  assert.match(occupied, /Rolling last 7 days from paid placement/);
+  assert.match(occupied, /Week 2026-W34 is an audit label/);
+  assert.match(occupied, /2026-08-23T23:00:00.000Z/);
+  assert.doesNotMatch(occupied, /2026-08-17T00:00:00.000Z/);
+  assert.match(occupied, /data-prize-title=""/);
+  assert.match(occupied, /Staff Backend Engineer/);
+  assert.match(occupied, /data-first-click="apply"/);
+  assert.match(occupied, />Apply</);
+  assert.match(occupied, /\$21/);
+  assert.match(occupied, /data-clicks/);
+  assert.match(occupied, />Outbid</);
+  assert.ok(occupied.indexOf('data-first-click="apply"') < occupied.indexOf("wall-plate"));
+  assert.doesNotMatch(occupied, /class="wall-rail"/);
+  assert.doesNotMatch(occupied, /data-list-after-apply-N|data-list-after-apply-eight/);
+  assert.doesNotMatch(occupied, /data-first-click="claim"/);
+});
+
+test("live rank is not a 24h lock on #1 — 25 hours later still occupies", () => {
+  seedPaid({
+    id: "lst_hold",
+    company: "Acme",
+    bidUsd: 12,
+    periodId: WEEK_33,
+    createdAt: "2026-08-16T12:00:00.000Z",
+  });
+  const twentyFiveHours = new Date("2026-08-17T13:00:00.000Z");
+  assert.deepEqual(
+    getLiveBoardListings("backend", twentyFiveHours).map((row) => row.id),
+    ["lst_hold"],
+  );
+  assert.ok(isInRollingWeek("2026-08-16T12:00:00.000Z", twentyFiveHours));
+});
+
+test("listing leaves live rank 7 days after paid placement", () => {
+  seedPaid({
+    id: "lst_expired",
+    company: "Acme",
+    bidUsd: 50,
+    periodId: WEEK_33,
+    createdAt: "2026-08-12T10:00:00.000Z",
+  });
+  seedPaid({
+    id: "lst_unpaid",
+    company: "Ghost",
+    bidUsd: 50_000,
+    paidUsd: 0,
+    periodId: WEEK_33,
+    createdAt: "2026-08-19T09:00:00.000Z",
+  });
+  const justAfter = new Date("2026-08-19T10:00:00.001Z");
+  assert.equal(isInRollingWeek("2026-08-12T10:00:00.000Z", justAfter), false);
+  assert.deepEqual(getLiveBoardListings("backend", justAfter), []);
+  assert.deepEqual(getBoardListings("backend", WEEK_33).map((row) => row.id), [
+    "lst_expired",
   ]);
 });
 
@@ -268,6 +378,8 @@ test("closed-week board is read-only history of that period", () => {
   assert.match(html, /data-period="2026-W33"/);
   assert.match(html, /data-period-live="false"/);
   assert.match(html, /Closed week/);
+  assert.doesNotMatch(html, /data-week-window="rolling-7d"/);
+  assert.doesNotMatch(html, /Rolling last 7 days from paid placement/);
   assert.match(html, /period=2026-W33/);
   assert.match(html, /data-empty-closed="true"/);
   assert.match(html, /data-empty-honest=""/);

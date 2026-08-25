@@ -64,7 +64,7 @@ Process exit 0 (`PASS=11` `PASS-ERROR=2` `BLOCKED-SECRET=0` `FAIL=0`).
 | 10 | Telegram / Discord / NSFW URL | **PASS-ERROR** | `chat_link_forbidden` / `nsfw_forbidden`. No row. |
 | 11 | Click apply | **PASS** | `GET /out/lst_0002` **302** to canonical URL. Clicks `0 → 1`. No tracking on redirect. |
 | 12 | Salary omitted | **PASS** | Card has no salary figures. None invented. |
-| 13 | Clock at Monday 00:00 UTC | **PASS** | Sunday process `2026-W33` listed last-week bid. Monday 00:00 UTC process is `2026-W34`; previous bids absent from live board. |
+| 13 | Clock at Monday 00:00 UTC after a Sunday paid placement | **contract** | Live rank is rolling last 7 days from paid placement. Sunday occupancy must still hold; expires `createdAt + 7d`. weekId may change as an audit label. Not a 24h lock. Re-run operator smoke against this window. |
 
 Sandbox token against production `https://api.polar.sh` is 401. Live checkout uses `POLAR_API_BASE`. Missing secret still records `BLOCKED-SECRET` and does not invent a paid row.
 

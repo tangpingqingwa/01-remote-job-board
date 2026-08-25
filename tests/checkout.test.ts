@@ -777,3 +777,45 @@ test("checkout route rejects a stranger raise with identity_taken", async () => 
   defaultBoardStore.reset();
   resetFixtureIds();
 });
+
+test("raise still hits the same listing across an audit weekId while inside the rolling 7 days", () => {
+  const store = new BoardStore();
+  const sunday = new Date("2026-08-16T23:00:00.000Z");
+  store.insertPaid({
+    id: "lst_sunday",
+    periodId: "2026-W33",
+    lane: "backend",
+    title: "Staff Backend Engineer",
+    company: "Acme",
+    companyHandle: "acme",
+    applyUrl: "https://jobs.example.com/acme",
+    salary: null,
+    bidUsd: 5,
+    paidUsd: 5,
+    clicks: 0,
+    createdAt: sunday.toISOString(),
+    updatedAt: sunday.toISOString(),
+    payerId: "pay_acme",
+  });
+  const monday = new Date("2026-08-17T00:01:00.000Z");
+  const raiseDraft = draftFromOutbidInput({
+    identity: "https://jobs.example.com/acme",
+    amountUsd: 8,
+    lane: "backend",
+    periodId: "2026-W34",
+    company: "Acme",
+    payerId: "pay_acme",
+  });
+  const plan = planCheckout(store, raiseDraft, undefined, monday);
+  assert.equal(plan.kind, "raise");
+  assert.equal(plan.chargeUsd, 3);
+  if (plan.kind === "raise") {
+    assert.equal(plan.existing.id, "lst_sunday");
+    assert.equal(plan.existing.periodId, "2026-W33");
+  }
+
+  const expired = new Date("2026-08-23T23:00:00.001Z");
+  const fresh = planCheckout(store, raiseDraft, undefined, expired);
+  assert.equal(fresh.kind, "create");
+  assert.equal(fresh.chargeUsd, 8);
+});

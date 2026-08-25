@@ -269,7 +269,12 @@ test("same canonical apply URL is a raise, not a second card", () => {
     company: "Acme",
     payerId: "pay_acme",
   });
-  const plan = planCheckout(store, raise);
+  const plan = planCheckout(
+    store,
+    raise,
+    undefined,
+    new Date("2026-08-18T10:00:00.000Z"),
+  );
   assert.equal(plan.kind, "raise");
   assert.equal(plan.chargeUsd, 3);
   assert.equal(raise.applyUrl, "https://jobs.example.com/acme");

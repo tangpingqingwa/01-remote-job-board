@@ -686,7 +686,11 @@ if [[ -f package.json ]]; then
   grep -q 'global remote' src/app/about/page.tsx || fail "about must state global remote"
   grep -q '≥ $5' src/app/rules/page.tsx || fail "rules must state min $5"
   grep -q '$50,000' src/app/rules/page.tsx || fail "rules must state max $50,000"
-  grep -q 'Monday 00:00' src/app/rules/page.tsx || fail "rules must state weekly UTC reset"
+  grep -q 'Monday 00:00' src/app/rules/page.tsx || fail "rules must state Monday 00:00 as weekId audit"
+  grep -q 'rolling last 7 days' src/app/rules/page.tsx \
+    || fail "rules must state rolling last 7 days from paid placement"
+  grep -q 'audit label' src/app/rules/page.tsx \
+    || fail "rules must keep weekId as an audit label"
   grep -q 'never invent salaries' src/app/rules/page.tsx || fail "rules must forbid invented salaries"
   grep -q 'newBid − currentBid' src/app/rules/page.tsx || fail "rules must state raise-the-difference"
   grep -q 'Telegram' src/app/rules/page.tsx || fail "rules must document chat-link rejects"
@@ -726,7 +730,26 @@ if [[ -f package.json ]]; then
   grep -q 'export function resolveBoardPeriod' src/lib/period.ts \
     || fail "period.ts must resolve ?period= closed weeks"
   grep -q 'Monday' src/lib/period.ts \
-    || fail "period.ts must document Monday 00:00 UTC"
+    || fail "period.ts must document Monday 00:00 UTC as weekId audit"
+  grep -q 'ROLLING_WEEK_MS' src/lib/period.ts \
+    || fail "period.ts must export the rolling 7-day window"
+  grep -q '7 \* DAY_MS' src/lib/period.ts \
+    || fail "live rank window must be 7 days, not a 24h lock"
+  grep -q 'export function isInRollingWeek' src/lib/period.ts \
+    || fail "period.ts must test paid placement against the rolling last 7 days"
+  grep -q 'export function liveRankResetAt' src/lib/period.ts \
+    || fail "period.ts must expire occupied rank from paid placement"
+  grep -q 'export function placementExpiresAt' src/lib/period.ts \
+    || fail "period.ts must compute 7 days from paid placement"
+  if grep -nE 'ROLLING_WINDOW_MS = 24|24 \* 60 \* 60 \* 1000' src/lib/period.ts src/lib/board.ts src/lib/store.ts >/dev/null; then
+    fail "live rank must not be a 24h lock on #1"
+  fi
+  grep -q 'listPaidRolling' src/lib/store.ts \
+    || fail "store must list paid occupancy by rolling last 7 days"
+  grep -q 'findLiveByIdentity' src/lib/store.ts \
+    || fail "store must raise against the rolling window, not weekId"
+  grep -q 'listPaidRolling' src/lib/board.ts \
+    || fail "live board query must read rolling last-7-days occupancy"
   grep -q 'export async function GET' src/app/out/\[id\]/route.ts \
     || fail "click route must export GET"
   grep -q 'NextResponse.redirect' src/app/out/\[id\]/route.ts \
@@ -741,14 +764,42 @@ if [[ -f package.json ]]; then
     || fail "board must accept ?period="
   grep -q 'getLiveBoardListings' src/lib/board.ts \
     || fail "board.ts must expose getLiveBoardListings"
+  grep -q 'getLiveBoardListings' src/app/page.tsx \
+    || fail "live board must load rolling last-7-days occupancy"
+  grep -q 'liveRankResetAt' src/app/page.tsx \
+    || fail "live board must reset from paid placement, not Monday 00:00 UTC"
+  grep -q 'data-week-window={live ? "rolling-7d"' src/components/board/board.tsx \
+    || fail "live wall must stamp the rolling last-7-days window"
+  grep -q 'Rolling last 7 days from paid placement' src/components/board/board.tsx \
+    || fail "live wall must say rolling last 7 days from paid placement"
+  grep -q 'audit label' src/components/board/board.tsx \
+    || fail "live wall must keep weekId as an audit label"
+  if grep -nE 'data-rolling-week-hop|data-rolling-strip|data-last-7d-strip|data-week-window-hop' \
+    src/components/board/board.tsx src/components/board/listing-card.tsx src/app/globals.css >/dev/null; then
+    fail "rolling last-7-days window must not add a second named hop"
+  fi
+  if grep -nE 'data-list-after-apply-eight|data-list-after-apply-N' \
+    src/components/board/listing-card.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "rolling week must not stamp list-after-apply-N"
+  fi
   grep -q 'href={applyClickPath' src/components/board/listing-card.tsx \
     || fail "listing card must link Apply through /out/:id"
   grep -q 'data-clicks' src/components/board/listing-card.tsx \
     || fail "listing card must show public clicks"
   grep -q 'Monday 00:00 UTC' tests/period.test.ts \
     || fail "period tests must cover Monday 00:00 UTC"
+  grep -q 'rolling last 7 days from paid placement' tests/period.test.ts \
+    || fail "period tests must cover rolling last 7 days from paid placement"
+  grep -q 'not a 24h lock' tests/period.test.ts \
+    || fail "period tests must keep live rank off a 24h lock on #1"
   grep -q 'getLiveBoardListings' tests/period.test.ts \
     || fail "period tests must drop old bids from the live query"
+  grep -q 'data-week-window="rolling-7d"' tests/period.test.ts \
+    || fail "period tests must stamp the occupied rolling window"
+  grep -q 'data-week-window="rolling-7d"' tests/rank.test.ts \
+    || fail "rank tests must cover occupied rolling last-7-days composition"
+  grep -q 'occupied week window is rolling last 7 days' tests/rank.test.ts \
+    || fail "rank tests must cover occupied rolling last-7-days week window"
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \

@@ -141,11 +141,16 @@ export function draftFromOutbidInput(input: {
 export function findListingByIdentity(
   store: BoardStore,
   draft: Pick<ListingDraft, "periodId" | "lane" | "applyUrl" | "companyHandle">,
+  now: Date = new Date(),
 ): Listing | undefined {
-  return store.findByIdentity(draft.periodId, draft.lane, {
-    applyUrl: draft.applyUrl,
-    companyHandle: draft.companyHandle,
-  });
+  return store.findLiveByIdentity(
+    draft.lane,
+    {
+      applyUrl: draft.applyUrl,
+      companyHandle: draft.companyHandle,
+    },
+    now,
+  );
 }
 
 export type CheckoutPlan =
@@ -157,11 +162,12 @@ export type CheckoutPlan =
       existing: Listing;
     };
 
-/** Same apply URL or handle in this lane + period is a raise, not a second card. */
+/** Same apply URL or handle in this lane's rolling last 7 days is a raise, not a second card. weekId is audit. */
 export function planCheckout(
   store: BoardStore,
   draft: ListingDraft,
   requestedChargeUsd?: number,
+  now: Date = new Date(),
 ): CheckoutPlan {
   draft.applyUrl = listingApplyUrl(draft.applyUrl);
 
@@ -172,7 +178,7 @@ export function planCheckout(
     throw new CheckoutError("bid_above_max", 400);
   }
 
-  const existing = findListingByIdentity(store, draft);
+  const existing = findListingByIdentity(store, draft, now);
 
   if (!existing) {
     if (draft.bidUsd < MIN_BID_USD) {
