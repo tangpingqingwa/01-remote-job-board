@@ -86,8 +86,7 @@ export function Board({
                   </>
                 ) : (
                   <>
-                    This week&apos;s remote (global) {laneLabel(lane)} wall. Rank
-                    is the bid.
+                    Week {periodId} is read-only week history. Rank is the bid.
                   </>
                 )}
               </p>

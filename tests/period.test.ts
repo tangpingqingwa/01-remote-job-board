@@ -485,7 +485,11 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   );
   assert.match(html, /data-period-live="false"/);
   assert.match(html, /Closed week/);
-  assert.match(html, /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/);
+  assert.match(html, /Week 2026-W33 is read-only week history/);
+  assert.doesNotMatch(
+    html,
+    /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/,
+  );
   assert.match(html, /aria-label="This week(?:'|&#x27;|&apos;)s #1"/);
   assert.match(html, /aria-label="Later ranks this week"/);
   assert.doesNotMatch(html, /wall is the rolling last 7 days from paid placement/);
