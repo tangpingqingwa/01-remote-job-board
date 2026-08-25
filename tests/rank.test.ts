@@ -5299,3 +5299,191 @@ test("closed empty period stamp is closed week history — not a live Next reset
   assert.doesNotMatch(unpaidHtml, /Closed week history/);
   assert.doesNotMatch(unpaidHtml, /data-listing-card/);
 });
+
+test("closed empty kicker is closed week history — not a generic Closed week", () => {
+  const listings = rankListings(specTieRows);
+  const closedEmpty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+      live: false,
+    }),
+  );
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: liveRankResetAt(listings, new Date("2026-08-17T14:00:00.000Z")),
+      listings,
+    }),
+  );
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const closedOccupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+      live: false,
+    }),
+  );
+  const unpaidHtml = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T14:00:00.000Z",
+      listings: rankListings([
+        fixtureListing({
+          id: "lst_unpaid_closed_empty_kicker",
+          company: "Ghost",
+          title: "Unpaid Staff Engineer",
+          bidUsd: 50_000,
+          paidUsd: 0,
+          clicks: 99,
+          createdAt: "2026-08-17T08:00:00.000Z",
+        }),
+      ]),
+    }),
+  );
+
+  const periodAt = closedEmpty.indexOf("Closed week history 2026-W33 — read only");
+  const factAt = closedEmpty.indexOf("Week 2026-W33 is read-only week history");
+  const kickerAt = closedEmpty.indexOf('class="empty-lane-kicker">Closed week history');
+  const genericKickerAt = closedEmpty.indexOf('class="empty-lane-kicker">Closed week<');
+  const closedMark = closedEmpty.indexOf('data-empty-closed="true"');
+  const pointerAt = closedEmpty.indexOf('data-live-week=""');
+  const pointerCopyAt = closedEmpty.indexOf(
+    "Open the live Backend wall for the rolling last 7 days from paid placement",
+  );
+  assert.ok(
+    kickerAt >= 0,
+    "closed empty kicker must name closed week history, not a generic Closed week",
+  );
+  assert.equal(genericKickerAt, -1);
+  assert.ok(periodAt >= 0 && factAt > periodAt);
+  assert.ok(kickerAt > factAt && closedMark >= 0 && pointerAt > kickerAt);
+  assert.ok(pointerCopyAt > pointerAt);
+
+  assert.match(closedEmpty, /data-period-live="false"/);
+  assert.match(closedEmpty, /Closed week history 2026-W33 — read only/);
+  assert.match(closedEmpty, /class="empty-lane-kicker">Closed week history</);
+  assert.doesNotMatch(closedEmpty, /class="empty-lane-kicker">Closed week</);
+  assert.doesNotMatch(closedEmpty, /Period 2026-W33\. Next reset/);
+  assert.doesNotMatch(closedEmpty, /Next reset 2026-08-24T00:00:00\.000Z/);
+  assert.doesNotMatch(closedEmpty, /Next reset/);
+  assert.match(closedEmpty, /Week 2026-W33 is read-only week history/);
+  assert.match(closedEmpty, /Rank is the bid/);
+  assert.match(closedEmpty, /data-empty-closed="true"/);
+  assert.match(closedEmpty, /data-empty-honest=""/);
+  assert.match(closedEmpty, /Bids are closed/);
+  assert.match(closedEmpty, /This lane was empty/);
+  assert.match(closedEmpty, /data-live-week=""/);
+  assert.match(
+    closedEmpty,
+    /Open the live Backend wall for the rolling last 7 days from paid placement/,
+  );
+  assert.doesNotMatch(closedEmpty, /Open this week/);
+  assert.doesNotMatch(
+    closedEmpty,
+    /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/,
+  );
+  assert.doesNotMatch(closedEmpty, /Empty bay/);
+  assert.doesNotMatch(closedEmpty, /Closed week history #1/);
+  assert.doesNotMatch(closedEmpty, /Later ranks in closed week history/);
+  assert.doesNotMatch(closedEmpty, /data-week-window="rolling-7d"/);
+  assert.doesNotMatch(
+    closedEmpty,
+    /Rolling last 7 days from paid placement\. Week 2026-W33 is an audit label/,
+  );
+  assert.doesNotMatch(closedEmpty, /wall is the rolling last 7 days from paid placement/);
+  assert.doesNotMatch(closedEmpty, /This remote \(global\) wall is empty/);
+  assert.doesNotMatch(closedEmpty, /Not Monday 00:00 UTC/);
+  assert.doesNotMatch(closedEmpty, /data-empty-window/);
+  assert.doesNotMatch(closedEmpty, /data-bid-form/);
+  assert.doesNotMatch(closedEmpty, />Outbid</);
+  assert.doesNotMatch(closedEmpty, /Claim #1 for/);
+  assert.doesNotMatch(closedEmpty, /data-first-click="apply"/);
+  assert.doesNotMatch(closedEmpty, /data-first-click="claim"/);
+  assert.doesNotMatch(closedEmpty, /data-listing-card/);
+  assert.doesNotMatch(closedEmpty, />Apply</);
+  assert.doesNotMatch(
+    closedEmpty,
+    /data-closed-empty-kicker|data-empty-kicker-hop|data-closed-kicker-hop|data-empty-history-kicker/,
+  );
+  assert.doesNotMatch(closedEmpty, /data-list-after-apply-N|data-list-after-apply-eight/);
+  assert.match(closedEmpty, /wall-rail/);
+
+  assert.match(occupied, /data-week-window="rolling-7d"/);
+  assert.match(
+    occupied,
+    /Rolling last 7 days from paid placement\. Week 2026-W34 is an audit label\. Next reset/,
+  );
+  assert.match(
+    occupied,
+    /This remote \(global\) Backend wall is the rolling last 7 days from paid placement/,
+  );
+  assert.match(occupied, /aria-label="Rolling last 7 days #1"/);
+  assert.match(occupied, /aria-label="Later ranks in the rolling last 7 days"/);
+  assert.match(occupied, /data-first-click="apply"/);
+  assert.match(occupied, />Apply</);
+  assert.ok(occupied.indexOf('data-first-click="apply"') < occupied.indexOf("wall-plate"));
+  assert.ok(occupied.indexOf("wall-plate") < occupied.indexOf('data-list-role="employer"'));
+  assert.doesNotMatch(occupied, /class="wall-rail"/);
+  assert.doesNotMatch(occupied, /empty-lane-kicker/);
+  assert.doesNotMatch(occupied, /Closed week history 2026-W34 — read only/);
+  assert.doesNotMatch(occupied, /Week 2026-W34 is read-only week history/);
+  assert.doesNotMatch(occupied, /Closed week history #1/);
+  assert.doesNotMatch(occupied, /Later ranks in closed week history/);
+  assert.doesNotMatch(occupied, /This week(?:'|&#x27;|&apos;)s #1/);
+  assert.doesNotMatch(occupied, /Later ranks this week/);
+
+  assert.match(empty, /data-empty-window=""/);
+  assert.match(empty, /This remote \(global\) wall is empty/);
+  assert.match(empty, /Not Monday 00:00 UTC/);
+  assert.match(empty, /The last 7 days from paid placement are empty/);
+  assert.match(empty, /Claim #1 for/);
+  assert.doesNotMatch(empty, /Closed week history 2026-W34 — read only/);
+  assert.doesNotMatch(empty, /Week 2026-W34 is read-only week history/);
+  assert.doesNotMatch(empty, /class="empty-lane-kicker">Closed week history</);
+  assert.doesNotMatch(empty, /Closed week history #1/);
+  assert.doesNotMatch(empty, /Later ranks in closed week history/);
+  assert.doesNotMatch(empty, /Period 2026-W34\. Next reset/);
+  assert.doesNotMatch(empty, /Next reset/);
+  assert.doesNotMatch(empty, /This week/);
+  assert.doesNotMatch(empty, /data-week-window/);
+  assert.doesNotMatch(empty, /aria-label="Rolling last 7 days #1"/);
+
+  assert.match(closedOccupied, /Closed week history 2026-W33 — read only/);
+  assert.doesNotMatch(closedOccupied, /Period 2026-W33\. Next reset/);
+  assert.doesNotMatch(closedOccupied, /Next reset 2026-08-24T00:00:00\.000Z/);
+  assert.doesNotMatch(closedOccupied, /Next reset/);
+  assert.match(closedOccupied, /Week 2026-W33 is read-only week history/);
+  assert.match(closedOccupied, /aria-label="Closed week history #1"/);
+  assert.match(closedOccupied, /aria-label="Later ranks in closed week history"/);
+  assert.doesNotMatch(closedOccupied, /empty-lane-kicker/);
+  assert.match(closedOccupied, /data-listing-card/);
+  assert.match(closedOccupied, />Apply</);
+  assert.doesNotMatch(closedOccupied, /This week(?:'|&#x27;|&apos;)s #1/);
+  assert.doesNotMatch(closedOccupied, /Later ranks this week/);
+  assert.doesNotMatch(closedOccupied, /data-week-window="rolling-7d"/);
+  assert.doesNotMatch(closedOccupied, /data-bid-form/);
+  assert.doesNotMatch(closedOccupied, />Outbid</);
+  assert.match(closedOccupied, /wall-rail/);
+  assert.match(closedOccupied, /wall-plate/);
+  assert.ok(closedOccupied.indexOf("wall-rail") < closedOccupied.indexOf("data-prize-title"));
+
+  assert.match(unpaidHtml, /data-empty-window=""/);
+  assert.doesNotMatch(unpaidHtml, /Ghost|Unpaid Staff Engineer/);
+  assert.doesNotMatch(unpaidHtml, /Closed week history/);
+  assert.doesNotMatch(unpaidHtml, /empty-lane-kicker/);
+  assert.doesNotMatch(unpaidHtml, /data-listing-card/);
+});
