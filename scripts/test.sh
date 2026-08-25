@@ -826,16 +826,10 @@ if [[ -f package.json ]]; then
     || fail "occupied live prize pack must name rolling last 7 days — not This week's #1"
   grep -q 'Later ranks in the rolling last 7 days' src/components/board/leaderboard.tsx \
     || fail "occupied live later pack must name the same rolling last-7-days window as the fact"
-  grep -q "This week's #1" src/components/board/leaderboard.tsx \
-    || fail "closed-week prize pack must keep This week's #1"
-  grep -q 'Later ranks this week' src/components/board/leaderboard.tsx \
-    || fail "closed-week later pack must keep Later ranks this week"
   grep -q 'occupied prize/later labels are rolling last 7 days' tests/rank.test.ts \
     || fail "rank tests must cover occupied prize/later rolling last-7-days labels"
   grep -q 'Rolling last 7 days #1' tests/period.test.ts \
     || fail "period tests must keep occupied live prize labels on the rolling window"
-  grep -q 'Later ranks this week' tests/period.test.ts \
-    || fail "period tests must keep closed-week later labels as Later ranks this week"
   if grep -nE 'data-rolling-prize|data-rolling-later|data-occupied-label-hop|data-prize-window-hop' \
     src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "occupied prize/later labels must not add a second named hop"
@@ -888,6 +882,26 @@ if [[ -f package.json ]]; then
   if grep -nE 'data-closed-occupied-fact|data-occupied-history-hop|data-closed-occupied-weekid-hop|data-occupied-history-fact-hop' \
     src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
     fail "closed occupied history fact must not add a second named hop"
+  fi
+  grep -q 'Closed week history #1' src/components/board/leaderboard.tsx \
+    || fail "closed occupied prize pack must name closed week history — not This week's #1"
+  grep -q 'Later ranks in closed week history' src/components/board/leaderboard.tsx \
+    || fail "closed occupied later pack must name closed week history — not Later ranks this week"
+  grep -q 'closed occupied prize/later labels are closed week history' tests/rank.test.ts \
+    || fail "rank tests must cover closed occupied prize/later labels as closed week history"
+  grep -q 'Closed week history #1' tests/period.test.ts \
+    || fail "period tests must name closed occupied prize labels as closed week history"
+  grep -q 'Later ranks in closed week history' tests/period.test.ts \
+    || fail "period tests must name closed occupied later labels as closed week history"
+  if grep -nE "This week's #1" src/components/board/leaderboard.tsx >/dev/null; then
+    fail "closed occupied prize pack must not label This week's #1"
+  fi
+  if grep -nE 'Later ranks this week' src/components/board/leaderboard.tsx >/dev/null; then
+    fail "closed occupied later pack must not label Later ranks this week"
+  fi
+  if grep -nE 'data-closed-occupied-labels|data-history-label-hop|data-closed-prize-hop|data-occupied-history-label' \
+    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
+    fail "closed occupied prize/later labels must not add a second named hop"
   fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
