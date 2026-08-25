@@ -72,9 +72,12 @@ test("GET /rules is a 200-class English page matching SPEC §3–§6", () => {
   // §4 cadence
   assert.match(html, /Monday 00:00:00.000 UTC/);
   assert.match(html, /YYYY-Www/);
+  assert.match(html, /rolling last 7 days/i);
+  assert.match(html, /audit label/);
   assert.match(html, /weekly reset/i);
   assert.match(html, /2026-W34/);
   assert.match(html, /pays again/);
+  assert.match(html, /Not a 24h lock/);
 
   // §5 listings
   assert.match(html, /Remote \(global\)/);

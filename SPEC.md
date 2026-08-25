@@ -30,7 +30,7 @@ Currency is **USD**. Copy is **English**. The market is **global remote**. There
 - Whole USD bids. Documented minimum **$5**. Documented maximum **$50,000**.
 - A bid below #1 still appears at the rank it can take.
 - Same apply URL or company handle can raise; the owner pays only the difference. A different payer cannot steal that rank by paying only the difference.
-- Weekly reset per function lane (Monday 00:00 UTC). Architecture must allow a daily flag later without rewriting rank.
+- Live rank is the rolling last 7 days from paid placement (not Monday 00:00 UTC, not a 24h lock). `periodId` / weekId is an ISO-week audit label. Architecture must allow a daily flag later without rewriting rank.
 - Apply-URL clicks are counted and public.
 - Polar is Merchant of Record in live. Tests use a fixture checkout. No live Polar in CI.
 - Pages: board, about, rules, checkout return.
@@ -61,11 +61,11 @@ These rules are the product. UI and payments exist to make them visible and enfo
 | Maximum | Any bid (first or raise) must be **≤ $50,000**. |
 | Below #1 still lists | A $5 bid on a lane whose #1 is $200 lists at the first rank whose current bid is `< 5`, or last if every bid is ≥ 5. |
 | Equal bids | The **older** listing (`createdAt` earlier) keeps the higher rank. |
-| Identity | A listing is keyed by `(periodId, lane, identity)`. `identity` is the canonical apply URL when present, else the company handle. |
-| Raise | Submitting the same apply URL or the same company handle in the same lane + period updates that listing. New bid must be **≥ current bid + 1**. Payer pays **newBid − currentBid** only. |
+| Identity | A live listing is keyed by `(lane, identity)` in the **rolling last 7 days**. `identity` is the canonical apply URL when present, else the company handle. `periodId` is an audit label, not the live key. |
+| Raise | Submitting the same apply URL or the same company handle in the same lane while that listing is still in the rolling window updates it. New bid must be **≥ current bid + 1**. Payer pays **newBid − currentBid** only. |
 | Cannot steal the difference | A different checkout identity cannot raise listing A by paying only `newBid − A.bid`. They must pay the **full** new bid as a new listing (or fail `raise_not_owner`). They cannot inherit A’s paid amount. |
 | Raise to take #1 | To become #1, `newBid` must be **≥ currentTopBid + 1**. Equal to the top bid is not enough (older keeps the higher rank). |
-| Period | Rankings are computed only among listings in the **current** period for that lane. Prior periods are history, not the live board. |
+| Period | Live rank is computed among paid listings whose `createdAt` (paid placement) falls in the **rolling last 7 days**. ISO `periodId` is an audit label. Closed weekIds remain history at `?period=`. |
 | Payment claims rank | An unpaid or abandoned checkout does not appear. Rank updates only after a completed payment (live Polar or fixture). |
 
 Worked examples:
@@ -80,19 +80,19 @@ Worked examples:
 
 ## 4. Cadence
 
-**Default: weekly reset per function lane.**
+**Default: rolling last 7 days from paid placement per function lane.** Not Monday 00:00 UTC. Not a 24h lock on #1.
 
 | Field | Value |
 |---|---|
 | Period length | 7 days |
-| Boundary | Monday 00:00:00.000 UTC |
-| `periodId` | ISO week in UTC, `YYYY-Www` (e.g. `2026-W34`) |
-| What resets | Live rank, bids, and click counters for the new period |
-| What does not carry | Previous period bid amounts. A company that wants #1 next week pays again. |
-| History | Prior-period listings remain readable at `/board?lane=backend&period=2026-W33` (no new bids on a closed period). |
-| Daily mode | `CADENCE=daily` is a documented future flag (`periodId` = `YYYY-MM-DD` UTC). v1 ships weekly. Ranking code must take `periodId` as a parameter so daily does not rewrite the sort. |
+| Live boundary | Rolling last 7 days from `createdAt` (paid placement). A Sunday 23:00 UTC bid still occupies Monday 00:01 UTC. |
+| `periodId` / weekId | ISO week in UTC, `YYYY-Www` (e.g. `2026-W34`). **Audit label only.** Monday 00:00:00.000 UTC opens a new weekId; it does not drop live rank. |
+| What ages out | A listing leaves live rank 7 days after paid placement. Rank among remaining paid rows is still the bid. |
+| What does not carry | An expired placement. A company that wants #1 again pays a new listing (full bid). A raise inside the window pays only the difference and does not restart a 24h lock. |
+| History | Prior weekId listings remain readable at `/board?lane=backend&period=2026-W33` (no new bids on a closed weekId). |
+| Daily mode | `CADENCE=daily` is a documented future flag (`periodId` = `YYYY-MM-DD` UTC). v1 ships the 7-day rolling window. Ranking code must take `periodId` as a parameter so daily does not rewrite the sort. |
 
-The board header shows the current period and the UTC instant of the next reset.
+The occupied board header shows the rolling last-7-days window, the weekId as an audit label, and the UTC instant the current #1 placement expires.
 
 ---
 
@@ -111,7 +111,7 @@ type FunctionLane =
 
 type Listing = {
   id: string                    // lst_...
-  periodId: string              // 2026-W34
+  periodId: string              // 2026-W34 audit weekId; live rank is rolling 7 days
   lane: FunctionLane
   title: string                 // job title, 3–80 chars
   company: string               // company display name, 2–60 chars
@@ -129,7 +129,7 @@ type Listing = {
 }
 
 type RankedListing = Listing & {
-  rank: number                  // 1-based in this (periodId, lane)
+  rank: number                  // 1-based in this live rolling window (or closed weekId)
 }
 ```
 
@@ -152,7 +152,7 @@ Apply URLs are cleaned and then validated. Failures are `422` with the codes in 
 5. Reject chat / invite hosts and paths: Telegram, WhatsApp, Discord, Messenger, Signal, Slack invite, Line, WeChat, Kakao, and similar invite links.
 6. Reject NSFW / adult hosts and path keywords (porn, onlyfans, fansly, and documented equivalents).
 7. Reject `javascript:`, `data:`, and non-http(s) schemes.
-8. Identity collision: same canonical apply URL or same company handle in the same `(periodId, lane)` is a **raise** of that listing, not a second card.
+8. Identity collision: same canonical apply URL or same company handle in the same live rolling 7-day window is a **raise** of that listing, not a second card. `periodId` stays an audit label.
 
 Clicks: `GET /out/:listingId` increments `clicks` by 1 (at-most-once per session cookie per listing per 10 minutes is enough against refresh spam) and **302**s to the stored apply URL with **no** query parameters added.
 
@@ -244,7 +244,7 @@ Operator-only. `scripts/live-smoke.sh` is **not** called from `scripts/test.sh` 
 | 10 | Telegram / Discord / NSFW URL | `422` `chat_link_forbidden` or `nsfw_forbidden` |
 | 11 | Click apply | public `clicks` increments; redirect has no tracking |
 | 12 | Salary omitted | card has no salary figures (none invented) |
-| 13 | Clock at Monday 00:00 UTC | new `periodId`; previous bids absent from live board |
+| 13 | Clock at Monday 00:00 UTC after a Sunday paid placement | listing still on the live board; expires 7 days after paid placement; weekId may change as an audit label. Not a 24h lock. |
 
 ---
 
@@ -259,7 +259,7 @@ Operator-only. `scripts/live-smoke.sh` is **not** called from `scripts/test.sh` 
 | 5 | Stranger pays $5 against a $10 listing | not a raise; original stays #1 |
 | 6 | `http://` or chat URL | 422, no row |
 | 7 | Salary left blank | `salary: null`, UI silent |
-| 8 | Period rolls | live board empty of last week’s bids |
+| 8 | Seven days after paid placement | listing absent from live rank; Monday 00:00 UTC alone does not drop it |
 | 9 | Click counter | public, integer, no dark traffic |
 
 ---

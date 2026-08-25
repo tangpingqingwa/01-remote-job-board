@@ -17,7 +17,7 @@ This document locks the stack and the PR sequence. Do not implement the app in t
 | UI | Server Components + small client islands for the bid form. Clone outbid.lol: one URL/handle field, amount, **Outbid** button, ranked cards with **$bid** and **clicks** |
 | DB | **SQLite** via `better-sqlite3` (one file). Tests use a temp file. No Postgres in v1 — keep CI offline and one-box |
 | Rank | Pure function `rankListings(listings): RankedListing[]` — `bidUsd` desc, then `createdAt` asc |
-| Period | `periodId` from UTC clock. Weekly default (`YYYY-Www`). Inject `now` in tests |
+| Period | Live rank = rolling last 7 days from paid placement. `periodId` is an ISO-week audit label (`YYYY-Www`). Inject `now` in tests |
 | Payments | `PolarPort.createCheckout({ amountUsd, listingDraft, successUrl })`. **Live Polar** when `POLAR_LIVE=1`. **`FakePolarPort`** fixture otherwise. `POLAR_FIXTURE_ONLY=1` always wins |
 | Clicks | `GET /out/[id]` increments then 302 to canonical apply URL |
 | Tests | `node:test` + fixture Polar. No network |
@@ -89,7 +89,7 @@ Until PR 1, only the contract files and `scripts/test.sh` exist.
 | raise | owner pays difference; stranger cannot pay only the difference |
 | urls | query stripped; chat/NSFW rejected; https required |
 | salary | omitted → null; never filled in |
-| period | Monday 00:00 UTC starts a new `periodId`; old bids absent from live query |
+| period | Monday 00:00 UTC starts a new audit `periodId`; live query is rolling last 7 days from paid placement, not that midnight |
 | polar | fixture checkout completes without network; live module unused unless flag |
 | clicks | `/out/:id` increments and redirects without adding query params |
 
@@ -136,7 +136,7 @@ Each heading below is exactly `### PR N: title` on its own line so the fleet par
 - **Acceptance:** SPEC §6 and error codes. Stored and outbound links have no tracking query.
 
 ### PR 7: Weekly reset + public apply clicks
-- **Description:** Period helper (Monday 00:00 UTC). Click route increments public count and 302s to the canonical apply URL. Board reads only the current `periodId` unless `?period=` is a closed week.
+- **Description:** Period helper (ISO weekId at Monday 00:00 UTC as an audit label). Live rank is the rolling last 7 days from paid placement. Click route increments public count and 302s to the canonical apply URL. Board reads the rolling window unless `?period=` is a closed weekId.
 - **Files:** `src/lib/period.ts`, `src/app/out/[id]/route.ts`, `tests/period.test.ts`
 - **Dependencies:** PR 2
 - **Acceptance:** Injected clock rolls the week; live query drops old bids. Click count is public on the card.
@@ -159,5 +159,5 @@ Launch-path complete is **not** fleet-done. After PR 8 is on `main`, an operator
 | Live Polar checkout | real Checkout or `BLOCKED-SECRET` + env var name |
 | Raise difference | live or fixture-on-live-process as documented in the smoke doc |
 | URL + NSFW + chat rejects | `PASS-ERROR` with SPEC codes |
-| Weekly boundary | clock-injected or documented wait; old bids gone |
+| Rolling 7-day window | clock-injected; occupancy gone 7 days after paid placement; Monday 00:00 UTC alone does not drop it |
 | Apply clicks | public increment + clean redirect |

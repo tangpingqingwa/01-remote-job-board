@@ -11,10 +11,10 @@ export default function AboutPage() {
     <main className="doc-page" data-page="about">
       <h1>About</h1>
       <p>
-        This is a public weekly auction for the #1 remote job in a function
-        lane. A company posts a remote job and a whole-dollar USD bid. The
-        listing with the highest bid is #1. Paying less than #1 still lists, at
-        the rank that bid can take.
+        This is a public rolling last-7-days auction for the #1 remote job in a
+        function lane. A company posts a remote job and a whole-dollar USD bid.
+        The listing with the highest bid is #1. Paying less than #1 still lists,
+        at the rank that bid can take.
       </p>
       <p>
         <strong>Rank is the bid</strong> — nothing else. Clicks, company size,
@@ -40,7 +40,8 @@ export default function AboutPage() {
       </p>
       <p>
         <a href="/rules">Read the rules</a> for ranking, the $5 minimum and
-        $50,000 maximum, raise-the-difference, and the weekly UTC reset.
+        $50,000 maximum, raise-the-difference, and the rolling last 7 days from
+        paid placement.
       </p>
     </main>
   );

@@ -55,9 +55,14 @@ export function Board({
       )}
       <div className="wall-bay">
         <header className="wall-mast">
-          <p className="period-meta" data-period={periodId}>
-            Period {periodId}. Next reset {nextResetAt}.
-            {live ? null : " Closed week — read only."}
+          <p
+            className="period-meta"
+            data-period={periodId}
+            data-week-window={live ? "rolling-7d" : undefined}
+          >
+            {live
+              ? `Rolling last 7 days from paid placement. Week ${periodId} is an audit label. Next reset ${nextResetAt}.`
+              : `Period ${periodId}. Next reset ${nextResetAt}. Closed week — read only.`}
           </p>
           {emptyFirst ? (
             <p className="wall-lane-fact">

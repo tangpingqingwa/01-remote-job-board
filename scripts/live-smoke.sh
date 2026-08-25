@@ -151,8 +151,8 @@ import { GET as getClick } from "../src/app/out/[id]/route.ts";
 import ReturnPage from "../src/app/return/page.tsx";
 import RulesPage from "../src/app/rules/page.tsx";
 import { Board } from "../src/components/board/board.tsx";
-import { getBoardListings, parseLane } from "../src/lib/board.ts";
-import { resolveBoardPeriod } from "../src/lib/period.ts";
+import { getBoardListings, getLiveBoardListings, parseLane } from "../src/lib/board.ts";
+import { liveRankResetAt, resolveBoardPeriod } from "../src/lib/period.ts";
 import { rankListings } from "../src/lib/rank.ts";
 
 {
@@ -242,12 +242,17 @@ function clockNow(): Date {
 
 async function renderBoard(url: URL): Promise<ReactNode> {
   const lane = parseLane(url.searchParams.get("lane") ?? undefined);
-  const period = resolveBoardPeriod(url.searchParams.get("period") ?? undefined, clockNow());
-  const listings = rankListings(getBoardListings(lane, period.periodId));
+  const now = clockNow();
+  const period = resolveBoardPeriod(url.searchParams.get("period") ?? undefined, now);
+  const listings = rankListings(
+    period.live
+      ? getLiveBoardListings(lane, now)
+      : getBoardListings(lane, period.periodId),
+  );
   return createElement(Board, {
     lane,
     periodId: period.periodId,
-    nextResetAt: period.nextResetAt,
+    nextResetAt: period.live ? liveRankResetAt(listings, now) : period.nextResetAt,
     listings,
     live: period.live,
   });
@@ -883,10 +888,10 @@ else
   record "12-salary-omitted" "FAIL" "salary=${salary_flag}"
 fi
 
-# --- SPEC §10.13 Clock at Monday 00:00 UTC ---
-# In-memory store is process-local, so seed last week on a Sunday process,
-# then start a Monday process that shares nothing — previous bids are absent
-# from the live board (new periodId). Documented clock inject via BOARD_NOW.
+# --- SPEC §10.13 Rolling last 7 days from paid placement ---
+# Sunday paid occupancy must not expire at Monday 00:00 UTC.
+# BOARD_NOW freezes Date so completeCheckout stamps createdAt = Sunday.
+# Next reset is placement + 7 days, not Monday midnight. Not a 24h lock.
 week_old_port="$(pick_port)"
 week_old_log="${WORKDIR}/week-old.log"
 week_old_base="http://127.0.0.1:${week_old_port}"
@@ -894,7 +899,7 @@ WEEK_PID="$(start_smoke_server "$week_old_port" "$week_old_log" "$SERVER_PATH" \
   "POLAR_FIXTURE_ONLY=1" \
   "BOARD_NOW=2026-08-16T23:59:59.999Z")"
 if ! wait_health "$week_old_base"; then
-  record "13-monday-reset" "FAIL" "Sunday-week process did not become healthy"
+  record "13-rolling-week" "FAIL" "Sunday-week process did not become healthy"
 else
   week_create_body="${WORKDIR}/week-create.body"
   week_create_hdrs="${WORKDIR}/week-create.hdrs"
@@ -913,33 +918,16 @@ else
   fi
   week_old_board="${WORKDIR}/week-old.html"
   http_get "$week_old_base" "/" "$week_old_board" >/dev/null || true
-  if [[ -n "${WEEK_PID}" ]]; then
-    kill_tree "${WEEK_PID}"
-    wait "${WEEK_PID}" 2>/dev/null || true
-  fi
-  WEEK_PID=""
-  week_new_port="$(pick_port)"
-  week_new_log="${WORKDIR}/week-new.log"
-  week_new_base="http://127.0.0.1:${week_new_port}"
-  WEEK_PID="$(start_smoke_server "$week_new_port" "$week_new_log" "$SERVER_PATH" \
-    "POLAR_FIXTURE_ONLY=1" \
-    "BOARD_NOW=2026-08-17T00:00:00.000Z")"
-  if ! wait_health "$week_new_base"; then
-    record "13-monday-reset" "FAIL" "Monday 00:00 UTC process did not become healthy"
+  if [[ "$week_create_code" == "303" && "$week_return_code" == "200" ]] \
+    && html_has "$week_old_board" "last-week.example/job-${STAMP}" \
+    && html_has "$week_old_board" 'data-period="2026-W33"' \
+    && html_has "$week_old_board" 'data-week-window="rolling-7d"' \
+    && html_has "$week_old_board" "Rolling last 7 days from paid placement" \
+    && html_has "$week_old_board" "2026-08-23T23:59:59.999Z" \
+    && ! html_has "$week_old_board" "2026-08-17T00:00:00.000Z"; then
+    record "13-rolling-week" "PASS" "Sunday paid placement holds 7 days; not Monday 00:00 UTC; weekId is audit"
   else
-    week_new_board="${WORKDIR}/week-new.html"
-    week_new_code="$(http_get "$week_new_base" "/" "$week_new_board" || true)"
-    if [[ "$week_create_code" == "303" && "$week_return_code" == "200" ]] \
-      && html_has "$week_old_board" "last-week.example/job-${STAMP}" \
-      && html_has "$week_old_board" 'data-period="2026-W33"' \
-      && [[ "$week_new_code" == "200" ]] \
-      && html_has "$week_new_board" 'data-period="2026-W34"' \
-      && ! html_has "$week_new_board" "last-week.example/job-${STAMP}" \
-      && html_has "$week_new_board" 'data-empty-lane="true"'; then
-      record "13-monday-reset" "PASS" "Monday 00:00 UTC new periodId 2026-W34; previous bids absent"
-    else
-      record "13-monday-reset" "FAIL" "create=${week_create_code} return=${week_return_code} monday=${week_new_code}"
-    fi
+    record "13-rolling-week" "FAIL" "create=${week_create_code} return=${week_return_code}"
   fi
   if [[ -n "${WEEK_PID}" ]]; then
     kill_tree "${WEEK_PID}"

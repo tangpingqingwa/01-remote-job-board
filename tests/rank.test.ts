@@ -8,6 +8,7 @@ import { Board } from "../src/components/board/board";
 import { Leaderboard } from "../src/components/board/leaderboard";
 import { ListingCard } from "../src/components/board/listing-card";
 import { getBoardListings, parseLane } from "../src/lib/board";
+import { liveRankResetAt } from "../src/lib/period";
 import { rankListings } from "../src/lib/rank";
 import { FUNCTION_LANES } from "../src/lib/types";
 import { fixtureListing, specTieRows } from "./fixtures/listings";
@@ -3841,4 +3842,67 @@ test("ranked fixture cards keep SPEC §3 order in markup", () => {
   assert.match(html, /\$20/);
   assert.match(html, /9 clicks/);
   assert.match(html, /4 clicks/);
+});
+
+test("occupied week window is rolling last 7 days from paid placement — not Monday 00:00 UTC", () => {
+  const listings = rankListings(specTieRows);
+  const occupied = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: liveRankResetAt(listings, new Date("2026-08-17T14:00:00.000Z")),
+      listings,
+    }),
+  );
+  const empty = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W34",
+      nextResetAt: "2026-08-24T14:00:00.000Z",
+      listings: [],
+    }),
+  );
+  const closed = renderToStaticMarkup(
+    createElement(Board, {
+      lane: "backend",
+      periodId: "2026-W33",
+      nextResetAt: "2026-08-24T00:00:00.000Z",
+      listings,
+      live: false,
+    }),
+  );
+
+  assert.match(occupied, /data-week-window="rolling-7d"/);
+  assert.match(occupied, /Rolling last 7 days from paid placement/);
+  assert.match(occupied, /Week 2026-W34 is an audit label/);
+  assert.match(occupied, /2026-08-24T10:00:00.000Z/);
+  assert.doesNotMatch(occupied, /2026-08-24T00:00:00.000Z/);
+  assert.match(occupied, /data-prize-title=""/);
+  assert.match(occupied, /Staff Backend Engineer/);
+  assert.match(occupied, /data-first-click="apply"/);
+  assert.match(occupied, />Apply</);
+  assert.match(occupied, /\$21/);
+  assert.match(occupied, /9 clicks/);
+  assert.match(occupied, />Outbid</);
+  assert.match(occupied, /amount-field/);
+  assert.ok(occupied.indexOf('data-first-click="apply"') < occupied.indexOf("wall-plate"));
+  assert.ok(occupied.indexOf("wall-plate") < occupied.indexOf('data-list-role="employer"'));
+  assert.doesNotMatch(occupied, /class="wall-rail"/);
+  assert.doesNotMatch(occupied, /data-list-after-apply-N|data-list-after-apply-eight/);
+  assert.doesNotMatch(occupied, /data-first-click="claim"/);
+
+  assert.match(empty, /data-week-window="rolling-7d"/);
+  assert.match(empty, /Rolling last 7 days from paid placement/);
+  assert.match(empty, /Claim #1 for/);
+  assert.match(empty, /data-first-click="claim"/);
+  assert.match(empty, /Claim #1, then pick the function/);
+  assert.match(empty, /<select[^>]*name="lane"/);
+  assert.ok(empty.indexOf("Claim #1 for") < empty.indexOf('name="lane"'));
+  assert.doesNotMatch(empty, /wall-rail|wall-plate/);
+  assert.doesNotMatch(empty, /data-first-click="apply"/);
+  assert.doesNotMatch(empty, /data-list-after-apply-N/);
+
+  assert.doesNotMatch(closed, /data-week-window="rolling-7d"/);
+  assert.match(closed, /Closed week/);
+  assert.match(closed, /wall-rail/);
 });
