@@ -52,7 +52,7 @@ export function Leaderboard({
           <p>
             Bids are closed.{" "}
             <a href={`/?lane=${lane}`} data-live-week="">
-              Open this week&apos;s live {laneLabel(lane)} wall
+              Open the live {laneLabel(lane)} wall for the rolling last 7 days from paid placement
             </a>
             .
           </p>
