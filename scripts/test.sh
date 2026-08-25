@@ -903,6 +903,28 @@ if [[ -f package.json ]]; then
     src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "closed occupied prize/later labels must not add a second named hop"
   fi
+  grep -qF 'Closed week history ${periodId} — read only.' src/components/board/board.tsx \
+    || fail "closed occupied period stamp must name closed week history — not a live Next reset clock"
+  grep -qF 'Period ${periodId}. Next reset ${nextResetAt}. Closed week — read only.' src/components/board/board.tsx \
+    || fail "closed empty period stamp must keep Period/Next reset Closed week — read only"
+  grep -qF 'Rolling last 7 days from paid placement. Week ${periodId} is an audit label. Next reset ${nextResetAt}.' src/components/board/board.tsx \
+    || fail "occupied week-window stamp must keep Next reset on the live rolling window"
+  grep -q 'closed occupied period stamp is closed week history' tests/rank.test.ts \
+    || fail "rank tests must cover closed occupied period stamp as closed week history"
+  grep -qF 'Closed week history 2026-W33 — read only' tests/period.test.ts \
+    || fail "period tests must name closed occupied period stamp as closed week history"
+  grep -qF 'Period 2026-W33\. Next reset 2026-08-24T00:00:00\.000Z' tests/period.test.ts \
+    || fail "period tests must keep closed empty period stamp as Period/Next reset"
+  closed_occupied_period="$(grep -F 'Closed week history ${periodId}' src/components/board/board.tsx || true)"
+  echo "$closed_occupied_period" | grep -qF 'Closed week history ${periodId} — read only.' \
+    || fail "closed occupied period stamp arm must name closed week history"
+  if echo "$closed_occupied_period" | grep -q "Next reset"; then
+    fail "closed occupied period stamp must not print a live Next reset clock"
+  fi
+  if grep -nE 'data-closed-occupied-period|data-history-period-hop|data-closed-period-hop|data-occupied-period-stamp' \
+    src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
+    fail "closed occupied period stamp must not add a second named hop"
+  fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \
