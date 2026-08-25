@@ -6,10 +6,12 @@ export function LaneTabs({
   lane,
   periodId,
   label = "Function lanes",
+  weekHistory = false,
 }: {
   lane: FunctionLane;
   periodId?: string;
   label?: string;
+  weekHistory?: boolean;
 }) {
   return (
     <nav className="lane-tabs" aria-label={label} data-lane-tabs="">
@@ -18,6 +20,7 @@ export function LaneTabs({
         const href = periodId
           ? `/?lane=${item}&period=${periodId}`
           : `/?lane=${item}`;
+        const name = laneLabel(item);
         return (
           <a
             key={item}
@@ -26,7 +29,7 @@ export function LaneTabs({
             aria-current={current ? "page" : undefined}
             data-lane={item}
           >
-            {laneLabel(item)}
+            {weekHistory ? `${name} week history` : name}
           </a>
         );
       })}

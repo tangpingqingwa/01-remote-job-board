@@ -1040,6 +1040,25 @@ if [[ -f package.json ]]; then
     src/components/board/board.tsx src/components/board/lane-tabs.tsx src/app/globals.css >/dev/null; then
     fail "closed occupied function-rail must not add a second named hop"
   fi
+  grep -q 'weekHistory={closedOccupied}' src/components/board/board.tsx \
+    || fail "closed occupied function plates must be week history — not live Function lanes"
+  grep -q 'weekHistory ? `${name} week history` : name' src/components/board/lane-tabs.tsx \
+    || fail "closed occupied function plates must read as week history — not live Function names"
+  grep -q 'closed occupied function plates are closed week history' tests/rank.test.ts \
+    || fail "rank tests must cover closed occupied function plates as closed week history"
+  grep -q 'closed occupied function plates must name closed week history, not live Function lanes' tests/period.test.ts \
+    || fail "period tests must name the closed occupied function plates as closed week history"
+  grep -q 'Backend week history' tests/period.test.ts \
+    || fail "period tests must show closed occupied plates as week history"
+  grep -q 'week history' src/components/board/lane-tabs.tsx \
+    || fail "closed occupied function plates arm must name week history"
+  if grep -q 'weekHistory={closedEmpty}' src/components/board/board.tsx; then
+    fail "closed occupied function plates must not restamp closed empty plates in this cut"
+  fi
+  if grep -nE 'data-closed-occupied-plates|data-occupied-function-plates-hop|data-closed-occupied-plates-hop|data-occupied-history-plates' \
+    src/components/board/board.tsx src/components/board/lane-tabs.tsx src/app/globals.css >/dev/null; then
+    fail "closed occupied function plates must not add a second named hop"
+  fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \

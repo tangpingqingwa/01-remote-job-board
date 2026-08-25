@@ -168,6 +168,8 @@ test("live rank is rolling last 7 days from paid placement — not Monday 00:00 
   assert.match(occupied, />Outbid</);
   assert.ok(occupied.indexOf('data-first-click="apply"') < occupied.indexOf("wall-plate"));
   assert.doesNotMatch(occupied, /class="wall-rail"/);
+  assert.match(occupied, /data-lane="backend"[^>]*>Backend</);
+  assert.doesNotMatch(occupied, /data-lane="backend"[^>]*>Backend week history</);
   assert.doesNotMatch(occupied, /data-list-after-apply-N|data-list-after-apply-eight/);
   assert.doesNotMatch(occupied, /data-first-click="claim"/);
 });
@@ -539,8 +541,16 @@ test("closed-week occupied board stays history and still has no checkout", () =>
     html.indexOf('class="wall-rail-kicker">Closed week history') >= 0,
     "closed occupied function-rail must name closed week history, not generic Function lanes",
   );
+  assert.ok(
+    html.indexOf(">Backend week history<") >= 0,
+    "closed occupied function plates must name closed week history, not live Function lanes",
+  );
   assert.match(html, /class="wall-rail-kicker">Closed week history</);
   assert.match(html, /aria-label="Closed week history"/);
+  assert.match(html, /data-lane="backend"[^>]*>Backend week history</);
+  assert.match(html, /data-lane="founding"[^>]*>Founding week history</);
+  assert.equal((html.match(/week history<\/a>/g) ?? []).length, 8);
+  assert.doesNotMatch(html, /data-lane="backend"[^>]*>Backend</);
   assert.doesNotMatch(html, /class="wall-rail-kicker">Function lanes</);
   assert.doesNotMatch(html, /aria-label="Function lanes"/);
   assert.doesNotMatch(html, /Function lanes/);
