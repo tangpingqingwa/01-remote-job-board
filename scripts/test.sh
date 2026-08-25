@@ -815,6 +815,13 @@ if [[ -f package.json ]]; then
     || fail "rank tests must cover empty rolling last-7-days copy"
   grep -q 'data-empty-window=""' tests/rank.test.ts \
     || fail "rank tests must stamp empty window copy without occupied week-window chrome"
+  grep -q 'This remote (global) {laneLabel(lane)} wall is the rolling last 7 days from paid placement' src/components/board/board.tsx \
+    || fail "occupied live fact must name the same rolling last-7-days window as empty"
+  grep -q 'occupied live fact is rolling last 7 days' tests/rank.test.ts \
+    || fail "rank tests must cover occupied live fact rolling last-7-days copy"
+  if grep -nE "occupiedLive \?" src/components/board/board.tsx | grep -q "This week"; then
+    fail "occupied live fact must not print This week's remote wall"
+  fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \

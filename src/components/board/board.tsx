@@ -76,8 +76,16 @@ export function Board({
             <>
               <h1 className="wall-lane-name">{laneLabel(lane)}</h1>
               <p className="wall-lane-fact">
-                This week&apos;s remote (global) {laneLabel(lane)} wall. Rank is
-                the bid.
+                {occupiedLive ? (
+                  <>
+                    This remote (global) {laneLabel(lane)} wall is the rolling last 7 days from paid placement. Rank is the bid.
+                  </>
+                ) : (
+                  <>
+                    This week&apos;s remote (global) {laneLabel(lane)} wall. Rank
+                    is the bid.
+                  </>
+                )}
               </p>
             </>
           )}
