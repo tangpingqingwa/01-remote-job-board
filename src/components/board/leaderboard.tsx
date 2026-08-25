@@ -84,7 +84,7 @@ export function Leaderboard({
         <ol
           className="leaderboard leaderboard-prize"
           data-prize-pack=""
-          aria-label="This week's #1"
+          aria-label={closed ? "This week's #1" : "Rolling last 7 days #1"}
         >
           <li key={prize.id}>
             <ListingCard listing={prize} live={!closed} />
@@ -95,7 +95,11 @@ export function Leaderboard({
         <ol
           className="leaderboard leaderboard-later"
           data-later-pack=""
-          aria-label="Later ranks this week"
+          aria-label={
+            closed
+              ? "Later ranks this week"
+              : "Later ranks in the rolling last 7 days"
+          }
         >
           {later.map((listing) => (
             <li key={listing.id}>
