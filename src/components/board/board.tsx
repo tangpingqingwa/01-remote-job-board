@@ -27,6 +27,8 @@ export function Board({
   const laneEmpty = paid.length === 0;
   const emptyFirst = live && laneEmpty;
   const occupiedLive = live && !laneEmpty;
+  const closedEmpty = !live && laneEmpty;
+  const functionRailName = closedEmpty ? "Closed week history" : "Function lanes";
   const claimForm = live ? (
     <BidForm
       lane={lane}
@@ -37,8 +39,12 @@ export function Board({
   ) : null;
   const lanePlates = (
     <>
-      <p className="wall-rail-kicker">Function lanes</p>
-      <LaneTabs lane={lane} periodId={live ? undefined : periodId} />
+      <p className="wall-rail-kicker">{functionRailName}</p>
+      <LaneTabs
+        lane={lane}
+        periodId={live ? undefined : periodId}
+        label={functionRailName}
+      />
     </>
   );
 

@@ -459,6 +459,11 @@ test("closed-week board is read-only history of that period", () => {
   assert.doesNotMatch(html, /<select[^>]*name="lane"/);
   assert.match(html, /wall-rail/);
   assert.match(html, /wall-plate/);
+  assert.match(html, /class="wall-rail-kicker">Closed week history</);
+  assert.match(html, /aria-label="Closed week history"/);
+  assert.doesNotMatch(html, /class="wall-rail-kicker">Function lanes</);
+  assert.doesNotMatch(html, /aria-label="Function lanes"/);
+  assert.doesNotMatch(html, /Function lanes/);
   assert.doesNotMatch(html, /data-listing-card/);
   assert.doesNotMatch(html, /href="\/out\//);
   assert.doesNotMatch(html, />Apply</);
@@ -530,6 +535,9 @@ test("closed-week occupied board stays history and still has no checkout", () =>
   assert.doesNotMatch(html, /<select[^>]*name="lane"/);
   assert.match(html, /wall-rail/);
   assert.match(html, /wall-plate/);
+  assert.match(html, /class="wall-rail-kicker">Function lanes</);
+  assert.match(html, /aria-label="Function lanes"/);
+  assert.doesNotMatch(html, /class="wall-rail-kicker">Closed week history</);
   assert.ok(html.indexOf("wall-rail") < html.indexOf("data-prize-title"));
   assert.ok(html.indexOf("wall-rail") < html.indexOf(">Apply<"));
   assert.doesNotMatch(html, /data-one-identity/);
