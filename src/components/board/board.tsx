@@ -80,6 +80,10 @@ export function Board({
                   <>
                     This remote (global) {laneLabel(lane)} wall is the rolling last 7 days from paid placement. Rank is the bid.
                   </>
+                ) : laneEmpty ? (
+                  <>
+                    Week {periodId} is read-only week history. Rank is the bid.
+                  </>
                 ) : (
                   <>
                     This week&apos;s remote (global) {laneLabel(lane)} wall. Rank

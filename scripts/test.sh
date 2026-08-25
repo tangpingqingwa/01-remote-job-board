@@ -853,6 +853,24 @@ if [[ -f package.json ]]; then
     src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
     fail "closed empty live-pointer must not add a second named hop"
   fi
+  grep -q 'Week {periodId} is read-only week history' src/components/board/board.tsx \
+    || fail "closed empty history fact must name the closed weekId as read-only week history — not this week's wall"
+  grep -q "This week&apos;s remote (global) {laneLabel(lane)} wall" src/components/board/board.tsx \
+    || fail "closed occupied ?period= must keep This week's remote wall as read-only history"
+  grep -q 'closed empty history fact is closed weekId' tests/rank.test.ts \
+    || fail "rank tests must cover closed empty history fact as closed weekId"
+  grep -q 'Week 2026-W33 is read-only week history' tests/period.test.ts \
+    || fail "period tests must name closed empty as read-only week history"
+  closed_empty_fact="$(awk '/: laneEmpty \? \(/,/) : \(/' src/components/board/board.tsx)"
+  echo "$closed_empty_fact" | grep -q 'Week {periodId} is read-only week history' \
+    || fail "closed empty history fact arm must name the closed weekId"
+  if echo "$closed_empty_fact" | grep -q "This week"; then
+    fail "closed empty history fact must not title the bay This week's remote wall"
+  fi
+  if grep -nE 'data-closed-empty-fact|data-history-fact-hop|data-closed-weekid-hop|data-empty-history-hop' \
+    src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
+    fail "closed empty history fact must not add a second named hop"
+  fi
   grep -q '/out/' tests/period.test.ts \
     || fail "period tests must cover GET /out/:id"
   grep -q '302' tests/period.test.ts \
