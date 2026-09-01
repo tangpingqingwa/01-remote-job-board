@@ -1,6 +1,6 @@
 import type { Listing, RankedListing } from "./types";
 
-/** Polar (or the fixture) has reported paid. Unpaid drafts never rank. */
+/** Waffo (or the explicit fixture) has reported paid. Unpaid drafts never rank. */
 export function isPaidListing(listing: Pick<Listing, "paidUsd">): boolean {
   return Number.isInteger(listing.paidUsd) && listing.paidUsd >= 1;
 }

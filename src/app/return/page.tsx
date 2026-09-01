@@ -25,14 +25,22 @@ export default async function ReturnPage({ searchParams }: ReturnPageProps) {
     );
   }
 
+  if (result.listing) {
+    return (
+      <main className="return-page" data-return="success">
+        <h1>You&apos;re on the board</h1>
+        <p>{result.listing.company} is listed at ${result.listing.bidUsd}.</p>
+        <p>
+          <a href="/">Back to the board</a>
+        </p>
+      </main>
+    );
+  }
+
   return (
-    <main className="return-page" data-return="success">
-      <h1>You&apos;re on the board</h1>
-      <p>
-        {result.listing
-          ? `${result.listing.company} is listed at $${result.listing.bidUsd}.`
-          : "Payment completed. Rank updates only after paid."}
-      </p>
+    <main className="return-page" data-return="pending">
+      <h1>Payment pending</h1>
+      <p>Rank updates only after a trusted payment confirmation.</p>
       <p>
         <a href="/">Back to the board</a>
       </p>

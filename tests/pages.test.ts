@@ -6,6 +6,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { test } from "node:test";
 import AboutPage from "../src/app/about/page";
 import RulesPage from "../src/app/rules/page";
+import { GET as getHealth } from "../src/app/healthz/route";
+import {
+  SearchPopover,
+  searchListings,
+} from "../src/components/search-popover";
 
 const root = join(process.cwd());
 
@@ -27,71 +32,132 @@ test("board nav links to /about and /rules", () => {
   assert.match(layout, /Leaderboard/);
 });
 
-test("GET /about is a 200-class English page: no ads, no API keys, no revenue share", () => {
+test("maker contact is one visible mailto link in the global footer", () => {
+  const layout = read("src/app/layout.tsx");
+  const styles = read("src/app/globals.css");
+  const contact = layout.match(
+    /<span className="site-footer-maker" data-maker-contact>[\s\S]*?<\/span>/,
+  )?.[0];
+
+  assert.ok(contact);
+  assert.match(
+    contact,
+    /Built by <a href="mailto:tangpingqingwa@gmail\.com">tangpingqingwa@gmail\.com<\/a>/,
+  );
+  assert.equal((layout.match(/data-maker-contact/g) ?? []).length, 1);
+  assert.match(layout, /\{children\}[\s\S]*<footer className="site-footer">/);
+  assert.match(styles, /\.site-footer-maker\s*\{/);
+  assert.match(styles, /\.site-footer-maker a[\s\S]*?overflow-wrap:\s*anywhere/);
+  assert.match(styles, /a:focus-visible/);
+});
+
+test("Find is a closed, accessible search popover over real page listings", () => {
+  const html = renderToStaticMarkup(createElement(SearchPopover));
+  const component = read("src/components/search-popover.tsx");
+  const styles = read("src/app/globals.css");
+
+  assert.match(html, /role="search"/);
+  assert.match(html, /data-search-popover=""/);
+  assert.match(html, /aria-label="Search remote jobs"/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /aria-controls="search-panel-[^"]+"/);
+  assert.match(html, /aria-haspopup="dialog"/);
+  assert.match(component, /role="dialog"/);
+  assert.match(html, />Find</);
+  assert.doesNotMatch(html, /data-search-panel/);
+
+  const listings = [
+    {
+      id: "lst_acme",
+      title: "Staff Backend Engineer",
+      company: "Acme",
+      text: "Staff Backend Engineer Acme Backend paid placement",
+      href: "/out/lst_acme",
+    },
+    {
+      id: "lst_gamma",
+      title: "Platform Engineer",
+      company: "Gamma",
+      text: "Platform Engineer Gamma Backend paid placement",
+    },
+  ];
+  assert.deepEqual(searchListings(listings, "acme").map((row) => row.id), [
+    "lst_acme",
+  ]);
+  assert.deepEqual(searchListings(listings, "no such role"), []);
+  assert.deepEqual(searchListings(listings, "").map((row) => row.id), [
+    "lst_acme",
+    "lst_gamma",
+  ]);
+
+  assert.match(component, /event\.key === "Escape"/);
+  assert.match(component, /triggerRef\.current\?\.focus/);
+  assert.match(component, /data-listing-card\]\[data-listing-id\]/);
+  assert.match(component, /a\[data-apply-url\]\[href\^='/);
+  assert.match(styles, /\.search-panel\s*\{/);
+  assert.match(styles, /\.search-popover\s*\{/);
+});
+
+test("GET /healthz reports readiness without configuration details", async () => {
+  const response = await getHealth();
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true });
+  assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+test("health route keeps readiness helper outside the App Router module exports", () => {
+  const route = read("src/app/healthz/route.ts");
+  const helper = read("src/lib/health.ts");
+  assert.match(route, /export const dynamic = "force-dynamic"/);
+  assert.match(route, /export const runtime = "nodejs"/);
+  assert.match(route, /export async function GET/);
+  assert.doesNotMatch(route, /export function checkReadiness/);
+  assert.match(helper, /export function checkReadiness/);
+});
+
+test("GET /about is a production-facing English page", () => {
   const html = renderPage(AboutPage);
   assert.match(html, /data-page="about"/);
   assert.match(html, /<h1>About<\/h1>/);
-  assert.match(html, /no ads/i);
-  assert.match(html, /no API keys/i);
-  assert.match(html, /no revenue share/i);
+  assert.match(html, /Remote Job Board/);
   assert.match(html, /Rank is the bid/);
   assert.match(html, /English/);
   assert.match(html, /USD/);
-  assert.match(html, /global remote/i);
-  assert.match(html, /never invent a salary/i);
+  assert.match(html, /remote roles open to applicants across regions/i);
+  assert.match(html, /never filled with an estimate/i);
+  assert.match(html, /payment is confirmed/i);
   assert.match(html, /href="\/rules"/);
-  assert.doesNotMatch(html, /POLAR_LIVE/);
-  assert.doesNotMatch(html, /api\.polar/);
+  assert.doesNotMatch(
+    html,
+    /outbid\.lol|clone of|\bv1\b|fixture|API keys|Waffo|weekId|createdAt|paidAt|BLOCKED-/i,
+  );
 });
 
-test("GET /rules is a 200-class English page matching SPEC §3–§6", () => {
+test("GET /rules publishes business rules without implementation details", () => {
   const html = renderPage(RulesPage);
   assert.match(html, /data-page="rules"/);
   assert.match(html, /<h1>Rules<\/h1>/);
-
-  // §3 ranking
   assert.match(html, /Rank is the bid/);
-  assert.match(html, /bidUsd/);
   assert.match(html, /Whole dollars/);
-  assert.match(html, /≥ \$5/);
-  assert.match(html, /≤ \$50,000/);
+  assert.match(html, /starts at <strong>\$5/);
+  assert.match(html, /\$50,000/);
   assert.match(html, /Below #1 still lists/);
-  assert.match(html, /older/);
-  assert.match(html, /createdAt/);
-  assert.match(html, /periodId, lane, identity/);
-  assert.match(html, /newBid − currentBid/);
-  assert.match(html, /raise_not_owner/);
-  assert.match(html, /identity_taken/);
-  assert.match(html, /currentTopBid \+ 1/);
+  assert.match(html, /placed first/);
+  assert.match(html, /difference between the current bid and the new bid/);
   assert.match(html, /Payment claims rank/);
   assert.match(html, /Acme bids \$5/);
   assert.match(html, /Beta bids \$20/);
-  assert.match(html, /pays \$16/);
+  assert.match(html, /pays the \$16 difference/);
   assert.match(html, /Gamma bids \$21/);
-
-  // §4 cadence
-  assert.match(html, /Monday 00:00:00.000 UTC/);
-  assert.match(html, /YYYY-Www/);
-  assert.match(html, /rolling last 7 days/i);
-  assert.match(html, /audit label/);
-  assert.match(html, /weekly reset/i);
-  assert.match(html, /2026-W34/);
-  assert.match(html, /pays again/);
-  assert.match(html, /Not a 24h lock/);
-
-  // §5 listings
-  assert.match(html, /Remote \(global\)/);
-  assert.match(html, /never invent salaries/i);
-  assert.match(html, /competitive/);
-  assert.match(html, /no city field/i);
-
-  // §6 URL rules (documented; enforcement is a later PR)
-  assert.match(html, /https:/);
-  assert.match(html, /utm_\*/);
-  assert.match(html, /Telegram/);
-  assert.match(html, /Discord/);
-  assert.match(html, /NSFW/);
-  assert.match(html, /onlyfans/i);
-  assert.match(html, /GET \/out\/:listingId/);
-  assert.match(html, /no<\/strong> query parameters added/);
+  assert.match(html, /Rolling seven-day window/);
+  assert.match(html, /Monday midnight/);
+  assert.doesNotMatch(html, /week(?:ly)?\s+reset/i);
+  assert.match(html, /secure, public job-application link/i);
+  assert.match(html, /Tracking and affiliate parameters are removed/);
+  assert.match(html, /chat invitations/);
+  assert.match(html, /adult content/);
+  assert.doesNotMatch(
+    html,
+    /outbid\.lol|clone of|\bv1\b|fixture|API keys|Waffo|weekId|createdAt|paidAt|periodId|raise_not_owner|identity_taken|BLOCKED-/i,
+  );
 });

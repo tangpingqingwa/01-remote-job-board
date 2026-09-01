@@ -2,12 +2,18 @@ import { randomBytes } from "node:crypto";
 import type { FunctionLane, Listing, SalaryBand } from "./types";
 import { MAX_BID_USD, MIN_BID_USD } from "./types";
 import type { BoardStore } from "./store";
-import { canonicalizeApplyUrl, UrlError } from "./urls";
+import {
+  canonicalizeApplyUrl,
+  resolveShortenerInput,
+  type ShortenerResolveDeps,
+  UrlError,
+} from "./urls";
 
 export class CheckoutError extends Error {
   constructor(
     readonly code: string,
     readonly httpStatus: number,
+    readonly intentId?: string,
   ) {
     super(code);
     this.name = "CheckoutError";
@@ -72,10 +78,35 @@ export function listingApplyUrl(raw: string): string {
   }
 }
 
-function deriveApplyUrl(identity: string, handle: string): string {
+/**
+ * Prepare an identity for checkout creation. Only known shorteners can invoke
+ * the live one-hop resolver; handles and ordinary HTTPS URLs remain offline.
+ */
+export async function resolveListingIdentity(
+  raw: string,
+  deps: ShortenerResolveDeps = {},
+): Promise<string> {
+  try {
+    const candidate = await resolveShortenerInput(raw, deps);
+    return looksLikeAbsoluteUrl(candidate)
+      ? listingApplyUrl(candidate)
+      : candidate.trim();
+  } catch (error) {
+    if (error instanceof CheckoutError) throw error;
+    if (error instanceof UrlError) {
+      throw new CheckoutError(error.code, error.httpStatus);
+    }
+    throw error;
+  }
+}
+
+function deriveApplyUrl(identity: string): string {
   const trimmed = identity.trim();
   if (looksLikeAbsoluteUrl(trimmed)) return listingApplyUrl(trimmed);
-  return `https://${handle}.example`;
+  // A handle is a valid listing identity, but it is not a destination. Keep
+  // the persisted URL empty until the employer supplies a real HTTPS target;
+  // never turn a handle into a fabricated clickable host.
+  return "";
 }
 
 function deriveCompany(identity: string, handle: string): string {
@@ -94,6 +125,33 @@ export function newPayerId(): string {
   return `pay_${randomBytes(8).toString("hex")}`;
 }
 
+function normalizeSalary(salary: SalaryBand | null | undefined): SalaryBand | null {
+  if (salary == null) return null;
+  if (
+    !Number.isSafeInteger(salary.minUsd) ||
+    !Number.isSafeInteger(salary.maxUsd) ||
+    salary.minUsd < 0 ||
+    salary.maxUsd < salary.minUsd
+  ) {
+    throw new CheckoutError("salary_invalid", 422);
+  }
+  return { minUsd: salary.minUsd, maxUsd: salary.maxUsd };
+}
+
+/** Parse the optional annual USD range collected by the hiring-wall form. */
+export function parseSalaryBand(
+  minRaw: unknown,
+  maxRaw: unknown,
+): SalaryBand | null {
+  const min = typeof minRaw === "string" ? minRaw.trim() : "";
+  const max = typeof maxRaw === "string" ? maxRaw.trim() : "";
+  if (!min && !max) return null;
+  if (!/^\d+$/.test(min) || !/^\d+$/.test(max)) {
+    throw new CheckoutError("salary_invalid", 422);
+  }
+  return normalizeSalary({ minUsd: Number(min), maxUsd: Number(max) });
+}
+
 export function draftFromOutbidInput(input: {
   identity: string;
   amountUsd: number;
@@ -101,6 +159,7 @@ export function draftFromOutbidInput(input: {
   periodId: string;
   title?: string;
   company?: string;
+  salary?: SalaryBand | null;
   payerId?: string;
 }): ListingDraft {
   const identity = input.identity.trim();
@@ -131,8 +190,8 @@ export function draftFromOutbidInput(input: {
     title,
     company,
     companyHandle,
-    applyUrl: applyUrl ?? deriveApplyUrl(identity, companyHandle),
-    salary: null,
+    applyUrl: applyUrl ?? deriveApplyUrl(identity),
+    salary: normalizeSalary(input.salary),
     bidUsd: input.amountUsd,
     payerId: input.payerId ?? newPayerId(),
   };
@@ -169,7 +228,7 @@ export function planCheckout(
   requestedChargeUsd?: number,
   now: Date = new Date(),
 ): CheckoutPlan {
-  draft.applyUrl = listingApplyUrl(draft.applyUrl);
+  if (draft.applyUrl) draft.applyUrl = listingApplyUrl(draft.applyUrl);
 
   if (!Number.isInteger(draft.bidUsd) || draft.bidUsd < 1) {
     throw new CheckoutError("invalid_bid", 400);

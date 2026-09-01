@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Rules · Remote Job Board",
   description:
-    "Rank is the bid. Min $5, max $50,000. Rolling last 7 days from paid placement. No invented salaries. Global remote.",
+    "Rank is the bid. Minimum $5, maximum $50,000, with a rolling seven-day placement window.",
 };
 
 export default function RulesPage() {
@@ -11,8 +11,8 @@ export default function RulesPage() {
     <main className="doc-page" data-page="rules">
       <h1>Rules</h1>
       <p>
-        These rules are the product. A bidder can predict rank from this page
-        alone. Rank is the bid.
+        The board follows the published rules below. There are no hidden
+        ranking factors: rank is the bid.
       </p>
 
       <h2>Ranking</h2>
@@ -21,235 +21,142 @@ export default function RulesPage() {
           <tr>
             <th>Rank is the bid</th>
             <td>
-              Sort key is <code>bidUsd</code> descending. Nothing else (clicks,
-              company size, recency of raise except the tie-break) moves rank.
+              Listings are ordered by bid from highest to lowest. Clicks,
+              company size, and editorial preference do not affect rank.
             </td>
           </tr>
           <tr>
             <th>Whole dollars</th>
-            <td>Bids are integers ≥ 1. No cents. Step is $1.</td>
+            <td>Bids use whole US dollars. The step is $1.</td>
           </tr>
           <tr>
             <th>Minimum</th>
             <td>
-              First bid on a listing in a period must be <strong>≥ $5</strong>.
+              A new listing starts at <strong>$5</strong> or more.
             </td>
           </tr>
           <tr>
             <th>Maximum</th>
             <td>
-              Any bid (first or raise) must be <strong>≤ $50,000</strong>.
+              A bid or raise cannot exceed <strong>$50,000</strong>.
             </td>
           </tr>
           <tr>
             <th>Below #1 still lists</th>
             <td>
-              A $5 bid on a lane whose #1 is $200 lists at the first rank whose
-              current bid is &lt; 5, or last if every bid is ≥ 5.
+              A bid below the current leader still appears at the rank that
+              amount can take.
             </td>
           </tr>
           <tr>
             <th>Equal bids</th>
-            <td>
-              The <strong>older</strong> listing (<code>createdAt</code>{" "}
-              earlier) keeps the higher rank.
-            </td>
+            <td>The listing placed first keeps the higher rank.</td>
           </tr>
           <tr>
-            <th>Identity</th>
+            <th>Listing identity</th>
             <td>
-              A live listing is keyed by <code>(lane, identity)</code> in the
-              rolling last 7 days. <code>identity</code> is the canonical apply
-              URL when present, else the company handle.{" "}
-              <code>periodId</code> is an audit label, not the live key (
-              <code>periodId, lane, identity</code> stays history).
+              The same apply link or company handle in the same function lane
+              is treated as the same active listing during its seven-day run.
             </td>
           </tr>
           <tr>
             <th>Raise</th>
             <td>
-              Submitting the same apply URL or the same company handle in the
-              same lane while that listing is still in the rolling last 7 days
-              updates that listing. New bid must be{" "}
-              <strong>≥ current bid + 1</strong>. Payer pays{" "}
-              <strong>newBid − currentBid</strong> only.
+              A raise must add at least $1. The original payer pays only the
+              difference between the current bid and the new bid.
             </td>
           </tr>
           <tr>
-            <th>Cannot steal the difference</th>
+            <th>Listing ownership</th>
             <td>
-              A different checkout identity cannot raise listing A by paying
-              only <code>newBid − A.bid</code>. They must pay the{" "}
-              <strong>full</strong> new bid as a new listing (or fail{" "}
-              <code>raise_not_owner</code>). They cannot inherit A&apos;s paid
-              amount. v1 rejects a second payer on an existing identity (
-              <code>identity_taken</code>).
+              Another employer cannot take over an existing listing by paying
+              only its raise amount. A different employer submits a new
+              listing and pays its full bid.
             </td>
           </tr>
           <tr>
-            <th>Raise to take #1</th>
+            <th>Take #1</th>
             <td>
-              To become #1, <code>newBid</code> must be{" "}
-              <strong>≥ currentTopBid + 1</strong>. Equal to the top bid is not
-              enough (older keeps the higher rank).
-            </td>
-          </tr>
-          <tr>
-            <th>Period</th>
-            <td>
-              Live rank is computed among paid listings whose{" "}
-              <code>createdAt</code> (paid placement) falls in the{" "}
-              <strong>rolling last 7 days</strong>. ISO <code>periodId</code>{" "}
-              is an audit label. Closed weekIds remain history, not the live
-              board.
+              To move above the current leader, the new bid must be at least
+              $1 higher. Matching the leader is not enough because older
+              listings win ties.
             </td>
           </tr>
           <tr>
             <th>Payment claims rank</th>
             <td>
-              An unpaid or abandoned checkout does not appear. Rank updates
-              only after a completed payment (live Polar or fixture).
+              Rank changes only after payment is confirmed. An incomplete or
+              abandoned checkout never appears on the board.
             </td>
           </tr>
         </tbody>
       </table>
 
-      <h2>Worked examples</h2>
+      <h2>Worked example</h2>
       <ol>
-        <li>Lane empty. Acme bids $5 → #1 at $5.</li>
-        <li>Beta bids $20 → Beta #1 ($20), Acme #2 ($5).</li>
+        <li>Acme bids $5 and takes #1 on an empty lane.</li>
+        <li>Beta bids $20 and becomes #1; Acme moves to #2.</li>
+        <li>Acme raises to $21, pays the $16 difference, and retakes #1.</li>
         <li>
-          Acme raises to $21 and pays $16. Acme #1 ($21), Beta #2 ($20).
-        </li>
-        <li>
-          Gamma bids $21. Tie on dollars; Acme is older → Acme #1, Gamma #2,
-          Beta #3.
-        </li>
-        <li>
-          Delta tries to submit Acme&apos;s apply URL and pay $1 (the
-          difference to $22). Rejected: not the owner (
-          <code>raise_not_owner</code>). A second payer on that identity is{" "}
-          <code>identity_taken</code>.
+          Gamma bids $21. Acme remains higher because its listing was placed
+          first.
         </li>
       </ol>
 
-      <h2>Rolling 7-day window</h2>
+      <h2>Rolling seven-day window</h2>
       <table>
         <tbody>
           <tr>
-            <th>Period length</th>
-            <td>
-              7 days from paid placement. Not a 24h lock on #1. Default is a{" "}
-              weekly reset length per function lane.
-            </td>
+            <th>Duration</th>
+            <td>Each paid placement remains eligible for seven days.</td>
           </tr>
           <tr>
             <th>Boundary</th>
             <td>
-              <strong>Rolling last 7 days from paid placement</strong>. Not{" "}
-              <strong>Monday 00:00:00.000 UTC</strong> as the live rank
-              boundary. Monday 00:00:00.000 UTC only opens a new audit weekId.
+              The window follows each placement time. It does not reset for
+              everyone at Monday midnight.
             </td>
           </tr>
           <tr>
-            <th>
-              <code>periodId</code>
-            </th>
+            <th>Expiry</th>
             <td>
-              ISO week in UTC, <code>YYYY-Www</code> (e.g. <code>2026-W34</code>
-              ). Audit label only.
+              When a placement reaches seven days, it leaves the live ranking.
+              Remaining paid listings keep their bid order.
             </td>
           </tr>
           <tr>
-            <th>What ages out</th>
+            <th>Return to the board</th>
             <td>
-              A listing leaves live rank 7 days after paid placement. Rank
-              among remaining paid rows is still the bid.
-            </td>
-          </tr>
-          <tr>
-            <th>What does not carry</th>
-            <td>
-              An expired placement. A company that wants #1 again pays a new
-              listing (full bid) — it pays again.
-            </td>
-          </tr>
-          <tr>
-            <th>History</th>
-            <td>
-              Prior-period listings remain readable at{" "}
-              <code>/board?lane=backend&amp;period=2026-W33</code> (no new bids
-              on a closed period).
+              An expired employer may place a new full bid to appear again.
             </td>
           </tr>
         </tbody>
       </table>
-      <p>
-        The occupied board header shows the rolling last 7 days from paid
-        placement, the weekId as an audit label, and the UTC instant the
-        current #1 placement expires. Daily mode (<code>CADENCE=daily</code>) is
-        a documented future flag. v1 ships the 7-day rolling window.
-      </p>
 
       <h2>Listings</h2>
       <p>
-        Every listing is a <strong>remote</strong> job. There is no city field.
-        Copy may say &quot;Remote (global)&quot;. Do not default a city.
-      </p>
-      <p>
-        <strong>Salary honesty:</strong> a salary band is present only when the
-        poster typed both bounds. The UI must not fill &quot;$0&quot;,
-        &quot;competitive&quot;, or a scraped band. Missing salary renders as
-        no salary line. We never invent salaries.
+        Every listing must be a remote job. Salary appears only when the
+        employer supplies both ends of a range. The board never inserts an
+        estimated or placeholder salary.
       </p>
 
-      <h2>Apply URLs</h2>
-      <p>
-        Apply URLs are cleaned and then validated. Failures are{" "}
-        <code>422</code>.
-      </p>
+      <h2>Apply links</h2>
       <ol>
+        <li>Use a secure, public job-application link.</li>
+        <li>Tracking and affiliate parameters are removed.</li>
+        <li>Link shorteners, chat invitations, and adult content are rejected.</li>
         <li>
-          Require <code>https:</code> (not <code>http:</code>).
+          Private, local-only, credentialed, or otherwise unsafe destinations
+          are rejected before checkout.
         </li>
         <li>
-          Resolve one redirect hop for known shortener hosts and replace the
-          stored URL with the final <code>https</code> target. Do not store the
-          shortener.
-        </li>
-        <li>
-          Strip the query string and fragment entirely (tracking, affiliate,{" "}
-          <code>utm_*</code>, <code>ref</code>, <code>fbclid</code>,{" "}
-          <code>gclid</code>).
-        </li>
-        <li>
-          Normalize: lowercase host, strip default <code>:443</code>, strip
-          trailing slash, reject credentials in the URL.
-        </li>
-        <li>
-          Reject chat / invite hosts and paths: Telegram, WhatsApp, Discord,
-          Messenger, Signal, Slack invite, Line, WeChat, Kakao, and similar
-          invite links.
-        </li>
-        <li>
-          Reject NSFW / adult hosts and path keywords (porn, onlyfans, fansly,
-          and documented equivalents).
-        </li>
-        <li>
-          Reject <code>javascript:</code>, <code>data:</code>, and non-http(s)
-          schemes.
-        </li>
-        <li>
-          Identity collision: same canonical apply URL or same company handle
-          in the rolling last 7 days is a <strong>raise</strong> of that
-          listing, not a second card. <code>periodId</code> stays an audit
-          label.
+          Reusing the same application link during an active placement is a
+          raise, not a second card.
         </li>
       </ol>
       <p>
-        Clicks: <code>GET /out/:listingId</code> increments the public click
-        count and <strong>302</strong>s to the stored apply URL with{" "}
-        <strong>no</strong> query parameters added.
+        Outbound clicks are counted publicly and go to the cleaned application
+        link. Clicks never change rank.
       </p>
     </main>
   );

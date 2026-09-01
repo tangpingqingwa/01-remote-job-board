@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { afterEach, test } from "node:test";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GET as getClick } from "../src/app/out/[id]/route";
 import { Board } from "../src/components/board/board";
-import { ListingCard } from "../src/components/board/listing-card";
-import {
-  getBoardListings,
-  getLiveBoardListings,
-} from "../src/lib/board";
+import { getBoardListings, getLiveBoardListings } from "../src/lib/board";
 import { applyClickPath } from "../src/lib/clicks";
 import {
   currentPeriodId,
@@ -24,13 +25,14 @@ import {
   ROLLING_WEEK_MS,
 } from "../src/lib/period";
 import { rankListings } from "../src/lib/rank";
-import { defaultBoardStore } from "../src/lib/store";
+import { defaultBoardStore, BoardStore } from "../src/lib/store";
 import { fixtureListing } from "./fixtures/listings";
 
 const WEEK_34 = "2026-W34";
 const WEEK_33 = "2026-W33";
 const MONDAY = new Date("2026-08-17T00:00:00.000Z");
 const SUNDAY = new Date("2026-08-16T23:59:59.999Z");
+const RESET_FOR_TEST = "2026-08-24T00:00:00.000Z";
 
 afterEach(() => {
   defaultBoardStore.reset();
@@ -40,10 +42,255 @@ function seedPaid(overrides: Parameters<typeof fixtureListing>[0]): void {
   defaultBoardStore.insertPaid(fixtureListing(overrides));
 }
 
-test("Monday 00:00 UTC is included in the new ISO week", () => {
+type StoreProcessResult = {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+};
+
+function runStoreProcess(
+  databasePath: string,
+  body: string,
+  extraEnv: Record<string, string> = {},
+): Promise<StoreProcessResult> {
+  const storeUrl = pathToFileURL(join(process.cwd(), "src/lib/store.ts")).href;
+  const rankUrl = pathToFileURL(join(process.cwd(), "src/lib/rank.ts")).href;
+  const source = `import { BoardStore } from ${JSON.stringify(storeUrl)}; import { rankListings } from ${JSON.stringify(rankUrl)}; ${body}`;
+  const child = spawn(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "--eval", source],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        DATABASE_PATH: databasePath,
+        WAFFO_MODE: "fixture",
+        ...extraEnv,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+
+  let stdout = "";
+  let stderr = "";
+  child.stdout?.setEncoding("utf8");
+  child.stderr?.setEncoding("utf8");
+  child.stdout?.on("data", (chunk: string) => {
+    stdout += chunk;
+  });
+  child.stderr?.on("data", (chunk: string) => {
+    stderr += chunk;
+  });
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result: StoreProcessResult) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+    child.once("error", (error) => {
+      finish({
+        code: null,
+        signal: null,
+        stdout,
+        stderr: `${stderr}${error instanceof Error ? error.stack ?? error.message : String(error)}`,
+      });
+    });
+    child.once("close", (code, signal) => {
+      finish({ code, signal, stdout, stderr });
+    });
+  });
+}
+
+test("BoardStore defers SQLite side effects until the first runtime operation", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "remote-job-board-lazy-store-"));
+  const databasePath = join(tempDir, "board.sqlite");
+  const store = new BoardStore(databasePath);
+
+  try {
+    assert.equal(existsSync(databasePath), false);
+    assert.deepEqual(store.listPaid("backend", WEEK_34), []);
+    assert.equal(existsSync(databasePath), true);
+  } finally {
+    store.close();
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("SQLite board survives process restart and concurrent click increments", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "remote-job-board-store-"));
+  const databasePath = join(tempDir, "board.sqlite");
+  const original = fixtureListing({
+    id: "lst_restart",
+    company: "Acme",
+    companyHandle: "acme-restart",
+    applyUrl: "https://jobs.example.com/acme-restart",
+    bidUsd: 5,
+    paidUsd: 5,
+    payerId: "pay_restart",
+    periodId: WEEK_34,
+    createdAt: "2026-08-20T09:00:00.000Z",
+  });
+  const competing = fixtureListing({
+    id: "lst_restart_competing",
+    company: "Beta",
+    companyHandle: "beta-restart",
+    applyUrl: "https://jobs.example.com/beta-restart",
+    bidUsd: 10,
+    paidUsd: 10,
+    payerId: "pay_competing",
+    periodId: WEEK_34,
+    createdAt: "2026-08-20T10:00:00.000Z",
+  });
+
+  try {
+    const seeded = await runStoreProcess(
+      databasePath,
+      `
+        const store = new BoardStore();
+        const peer = new BoardStore();
+        store.insertPaid(JSON.parse(process.env.ORIGINAL_LISTING ?? ""));
+        store.insertPaid(JSON.parse(process.env.COMPETING_LISTING ?? ""));
+        if (!peer.getById("lst_restart")) throw new Error("peer store did not observe insert");
+        peer.close();
+        store.close();
+      `,
+      {
+        ORIGINAL_LISTING: JSON.stringify(original),
+        COMPETING_LISTING: JSON.stringify(competing),
+      },
+    );
+    assert.equal(seeded.code, 0, seeded.stderr);
+
+    const raised = await runStoreProcess(
+      databasePath,
+      `
+        const store = new BoardStore();
+        const existing = store.findLiveByIdentity(
+          "backend",
+          { applyUrl: "https://jobs.example.com/acme-restart", companyHandle: "acme-restart" },
+          new Date("2026-08-20T12:00:00.000Z"),
+        );
+        if (!existing) throw new Error("restart listing was not found for raise");
+        store.updatePaid({ ...existing, bidUsd: 15, paidUsd: existing.paidUsd + 10, updatedAt: "2026-08-20T12:01:00.000Z" });
+        store.close();
+      `,
+    );
+    assert.equal(raised.code, 0, raised.stderr);
+
+    const verified = await runStoreProcess(
+      databasePath,
+      `
+        const store = new BoardStore();
+        const ranked = rankListings(store.listPaid("backend", "2026-W34"));
+        const clicked = store.incrementClicks("lst_restart");
+        process.stdout.write(JSON.stringify({
+          ids: ranked.map((row) => row.id),
+          bidUsd: ranked[0]?.bidUsd,
+          paidUsd: ranked[0]?.paidUsd,
+          clicks: clicked?.clicks,
+          payerId: clicked?.payerId,
+          createdAt: clicked?.createdAt,
+        }));
+        store.close();
+      `,
+    );
+    assert.equal(verified.code, 0, verified.stderr);
+    assert.deepEqual(JSON.parse(verified.stdout.trim()), {
+      ids: ["lst_restart", "lst_restart_competing"],
+      bidUsd: 15,
+      paidUsd: 15,
+      clicks: 1,
+      payerId: "pay_restart",
+      createdAt: original.createdAt,
+    });
+
+    const concurrentClicks = await Promise.all(
+      Array.from({ length: 6 }, () =>
+        runStoreProcess(
+          databasePath,
+          `
+            const store = new BoardStore();
+            if (!store.incrementClicks("lst_restart")) throw new Error("click target missing");
+            store.close();
+          `,
+        ),
+      ),
+    );
+    for (const result of concurrentClicks) assert.equal(result.code, 0, result.stderr);
+
+    const clickCount = await runStoreProcess(
+      databasePath,
+      `
+        const store = new BoardStore();
+        process.stdout.write(String(store.getById("lst_restart")?.clicks ?? -1));
+        store.close();
+      `,
+    );
+    assert.equal(clickCount.code, 0, clickCount.stderr);
+    assert.equal(clickCount.stdout.trim(), "7");
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("SQLite identity uniqueness serializes concurrent paid inserts", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "remote-job-board-unique-"));
+  const databasePath = join(tempDir, "board.sqlite");
+  const first = fixtureListing({
+    id: "lst_unique_a",
+    company: "Same Company",
+    companyHandle: "same-company",
+    applyUrl: "https://jobs.example.com/same-company",
+    bidUsd: 5,
+    paidUsd: 5,
+    payerId: "pay_a",
+    periodId: WEEK_34,
+    createdAt: "2026-08-21T09:00:00.000Z",
+  });
+  const second = { ...first, id: "lst_unique_b", payerId: "pay_b" };
+
+  try {
+    const initialized = await runStoreProcess(
+      databasePath,
+      `const store = new BoardStore(); store.close();`,
+    );
+    assert.equal(initialized.code, 0, initialized.stderr);
+    const results = await Promise.all([
+      runStoreProcess(
+        databasePath,
+        `const store = new BoardStore(); store.insertPaid(JSON.parse(process.env.LISTING ?? "")); store.close();`,
+        { LISTING: JSON.stringify(first) },
+      ),
+      runStoreProcess(
+        databasePath,
+        `const store = new BoardStore(); store.insertPaid(JSON.parse(process.env.LISTING ?? "")); store.close();`,
+        { LISTING: JSON.stringify(second) },
+      ),
+    ]);
+    assert.equal(results.filter((result) => result.code === 0).length, 1);
+    assert.equal(results.filter((result) => result.code !== 0).length, 1);
+    assert.match(results.find((result) => result.code !== 0)?.stderr ?? "", /UNIQUE constraint failed/);
+
+    const winner = await runStoreProcess(
+      databasePath,
+      `const store = new BoardStore(); process.stdout.write(JSON.stringify(store.listPaid("backend", "2026-W34").map((row) => row.id))); store.close();`,
+    );
+    assert.equal(winner.code, 0, winner.stderr);
+    assert.deepEqual(JSON.parse(winner.stdout.trim()).length, 1);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("ISO week labels follow Monday UTC while live rank remains rolling", () => {
   assert.equal(isoWeekPeriodId(MONDAY), WEEK_34);
+  assert.equal(isoWeekPeriodId(SUNDAY), WEEK_33);
   assert.equal(currentPeriodId(MONDAY), WEEK_34);
   assert.equal(nextMondayUtc(MONDAY).toISOString(), "2026-08-24T00:00:00.000Z");
+  assert.equal(nextMondayUtc(SUNDAY).toISOString(), "2026-08-17T00:00:00.000Z");
   assert.deepEqual(currentPeriodMeta(MONDAY), {
     periodId: WEEK_34,
     nextResetAt: "2026-08-24T00:00:00.000Z",
@@ -51,170 +298,94 @@ test("Monday 00:00 UTC is included in the new ISO week", () => {
     live: true,
   });
   assert.equal(ROLLING_WEEK_MS, 7 * 86_400_000);
-});
-
-test("Sunday still belongs to the previous ISO week", () => {
-  assert.equal(isoWeekPeriodId(SUNDAY), WEEK_33);
-  assert.equal(currentPeriodId(SUNDAY), WEEK_33);
-  assert.equal(nextMondayUtc(SUNDAY).toISOString(), "2026-08-17T00:00:00.000Z");
-});
-
-test("one millisecond before Monday 00:00 UTC stays on the previous week", () => {
-  assert.notEqual(isoWeekPeriodId(SUNDAY), isoWeekPeriodId(MONDAY));
-  assert.equal(isoWeekPeriodId(SUNDAY), WEEK_33);
-  assert.equal(isoWeekPeriodId(MONDAY), WEEK_34);
-});
-
-test("ISO year can differ from the calendar year near 1 January", () => {
-  assert.equal(isoWeekPeriodId(new Date("2026-12-31T12:00:00.000Z")), "2026-W53");
   assert.equal(isoWeekPeriodId(new Date("2027-01-01T00:00:00.000Z")), "2026-W53");
   assert.equal(isoWeekPeriodId(new Date("2027-01-04T00:00:00.000Z")), "2027-W01");
 });
 
-test("injected clock keeps Sunday occupancy through Monday 00:00 UTC", () => {
+test("paid placement stays live across Monday and expires after seven days", () => {
   seedPaid({
-    id: "lst_old",
+    id: "lst_sunday",
     company: "Acme",
     bidUsd: 21,
     periodId: WEEK_33,
-    createdAt: "2026-08-12T10:00:00.000Z",
+    createdAt: "2026-08-16T23:00:00.000Z",
   });
   seedPaid({
-    id: "lst_live",
+    id: "lst_monday",
     company: "Beta",
     bidUsd: 8,
     periodId: WEEK_34,
     createdAt: "2026-08-17T10:00:00.000Z",
   });
-
-  assert.deepEqual(
-    getLiveBoardListings("backend", SUNDAY).map((row) => row.id),
-    ["lst_old"],
-  );
-  assert.deepEqual(
-    getLiveBoardListings("backend", MONDAY).map((row) => row.id),
-    ["lst_old"],
-  );
-  assert.deepEqual(
-    getLiveBoardListings("backend", new Date("2026-08-17T10:00:00.000Z")).map(
-      (row) => row.id,
-    ),
-    ["lst_old", "lst_live"],
-  );
-  assert.deepEqual(getBoardListings("backend", WEEK_33).map((row) => row.id), [
-    "lst_old",
-  ]);
-});
-
-test("live rank is rolling last 7 days from paid placement — not Monday 00:00 UTC", () => {
-  seedPaid({
-    id: "lst_sunday",
-    company: "Acme",
-    title: "Staff Backend Engineer",
-    bidUsd: 21,
-    periodId: WEEK_33,
-    createdAt: "2026-08-16T23:00:00.000Z",
-  });
   const mondayMorning = new Date("2026-08-17T00:01:00.000Z");
-  const still = getLiveBoardListings("backend", mondayMorning);
-  assert.deepEqual(still.map((row) => row.id), ["lst_sunday"]);
-  assert.equal(isoWeekPeriodId(mondayMorning), WEEK_34);
-  assert.equal(still[0]?.periodId, WEEK_33);
+  assert.deepEqual(getLiveBoardListings("backend", mondayMorning).map((row) => row.id), [
+    "lst_sunday",
+  ]);
+  assert.deepEqual(
+    getLiveBoardListings("backend", new Date("2026-08-17T10:00:00.000Z")).map((row) => row.id),
+    ["lst_sunday", "lst_monday"],
+  );
   assert.equal(
     placementExpiresAt("2026-08-16T23:00:00.000Z"),
     "2026-08-23T23:00:00.000Z",
   );
   assert.equal(
-    liveRankResetAt(still, mondayMorning),
+    liveRankResetAt(getLiveBoardListings("backend", mondayMorning), mondayMorning),
     "2026-08-23T23:00:00.000Z",
   );
-  assert.notEqual(
-    liveRankResetAt(still, mondayMorning),
-    nextMondayUtc(mondayMorning).toISOString(),
-  );
-  assert.ok(isInRollingWeek("2026-08-16T23:00:00.000Z", mondayMorning));
+  assert.notEqual(liveRankResetAt([], mondayMorning), nextMondayUtc(mondayMorning).toISOString());
   assert.equal(
     rollingWeekStart(mondayMorning).toISOString(),
     "2026-08-10T00:01:00.000Z",
   );
+  assert.ok(isInRollingWeek("2026-08-16T23:00:00.000Z", mondayMorning));
 
-  const occupied = renderToStaticMarkup(
+  const expiredAt = new Date("2026-08-23T23:00:00.001Z");
+  assert.equal(isInRollingWeek("2026-08-16T23:00:00.000Z", expiredAt), false);
+  assert.deepEqual(getLiveBoardListings("backend", expiredAt).map((row) => row.id), [
+    "lst_monday",
+  ]);
+
+  const html = renderToStaticMarkup(
     createElement(Board, {
       lane: "backend",
       periodId: WEEK_34,
-      nextResetAt: liveRankResetAt(still, mondayMorning),
-      listings: rankListings(still),
+      nextResetAt: liveRankResetAt(getLiveBoardListings("backend", mondayMorning), mondayMorning),
+      listings: rankListings(getLiveBoardListings("backend", mondayMorning)),
     }),
   );
-  assert.match(occupied, /data-week-window="rolling-7d"/);
-  assert.match(occupied, /Rolling last 7 days from paid placement/);
-  assert.match(occupied, /Week 2026-W34 is an audit label/);
-  assert.match(
-    occupied,
-    /This remote \(global\) Backend wall is the rolling last 7 days from paid placement/,
-  );
-  assert.match(occupied, /aria-label="Rolling last 7 days #1"/);
-  assert.doesNotMatch(occupied, /This week(?:'|&#x27;|&apos;)s remote \(global\)/);
-  assert.doesNotMatch(occupied, /This week(?:'|&#x27;|&apos;)s #1/);
-  assert.doesNotMatch(occupied, /Later ranks this week/);
-  assert.match(occupied, /2026-08-23T23:00:00.000Z/);
-  assert.doesNotMatch(occupied, /2026-08-17T00:00:00.000Z/);
-  assert.match(occupied, /data-prize-title=""/);
-  assert.match(occupied, /Staff Backend Engineer/);
-  assert.match(occupied, /data-first-click="apply"/);
-  assert.match(occupied, />Apply</);
-  assert.match(occupied, /\$21/);
-  assert.match(occupied, /data-clicks/);
-  assert.match(occupied, />Outbid</);
-  assert.ok(occupied.indexOf('data-first-click="apply"') < occupied.indexOf("wall-plate"));
-  assert.doesNotMatch(occupied, /class="wall-rail"/);
-  assert.match(occupied, /data-lane="backend"[^>]*>Backend</);
-  assert.doesNotMatch(occupied, /data-lane="backend"[^>]*>Backend week history</);
-  assert.doesNotMatch(occupied, /data-list-after-apply-N|data-list-after-apply-eight/);
-  assert.doesNotMatch(occupied, /data-first-click="claim"/);
+  assert.match(html, /data-week-window="rolling-7d"/);
+  assert.match(html, /Rolling last 7 days from paid placement/);
+  assert.match(html, /Each placement expires seven days after payment/);
+  assert.doesNotMatch(html, /audit label|weekId/i);
+  assert.match(html, /data-prize-title=""/);
+  assert.match(html, />Apply</);
+  assert.match(html, />Outbid</);
+  assert.doesNotMatch(html, /data-empty-window|data-first-click="claim"/);
 });
 
-test("live rank is not a 24h lock on #1 — 25 hours later still occupies", () => {
+test("live rank is not a 24h lock — 25 hours later still occupies", () => {
+  const paidAt = new Date("2026-08-16T23:00:00.000Z");
+  const twentyFiveHoursLater = new Date("2026-08-18T00:00:00.000Z");
+  assert.equal(
+    twentyFiveHoursLater.getTime() - paidAt.getTime(),
+    25 * 60 * 60 * 1000,
+  );
   seedPaid({
-    id: "lst_hold",
+    id: "lst_25h",
     company: "Acme",
-    bidUsd: 12,
+    bidUsd: 21,
     periodId: WEEK_33,
-    createdAt: "2026-08-16T12:00:00.000Z",
+    createdAt: paidAt.toISOString(),
   });
-  const twentyFiveHours = new Date("2026-08-17T13:00:00.000Z");
   assert.deepEqual(
-    getLiveBoardListings("backend", twentyFiveHours).map((row) => row.id),
-    ["lst_hold"],
+    getLiveBoardListings("backend", twentyFiveHoursLater).map((row) => row.id),
+    ["lst_25h"],
   );
-  assert.ok(isInRollingWeek("2026-08-16T12:00:00.000Z", twentyFiveHours));
+  assert.ok(isInRollingWeek(paidAt.toISOString(), twentyFiveHoursLater));
 });
 
-test("listing leaves live rank 7 days after paid placement", () => {
-  seedPaid({
-    id: "lst_expired",
-    company: "Acme",
-    bidUsd: 50,
-    periodId: WEEK_33,
-    createdAt: "2026-08-12T10:00:00.000Z",
-  });
-  seedPaid({
-    id: "lst_unpaid",
-    company: "Ghost",
-    bidUsd: 50_000,
-    paidUsd: 0,
-    periodId: WEEK_33,
-    createdAt: "2026-08-19T09:00:00.000Z",
-  });
-  const justAfter = new Date("2026-08-19T10:00:00.001Z");
-  assert.equal(isInRollingWeek("2026-08-12T10:00:00.000Z", justAfter), false);
-  assert.deepEqual(getLiveBoardListings("backend", justAfter), []);
-  assert.deepEqual(getBoardListings("backend", WEEK_33).map((row) => row.id), [
-    "lst_expired",
-  ]);
-});
-
-test("board reads only the current periodId unless ?period= is a closed week", () => {
+test("board period resolution uses the current live period or an explicit closed history", () => {
   seedPaid({
     id: "lst_old",
     company: "Acme",
@@ -231,256 +402,109 @@ test("board reads only the current periodId unless ?period= is a closed week", (
   });
 
   const live = resolveBoardPeriod(undefined, MONDAY);
-  assert.equal(live.periodId, WEEK_34);
-  assert.equal(live.live, true);
   assert.deepEqual(
-    getBoardListings("backend", live.periodId).map((row) => row.id),
-    ["lst_live"],
+    [live.periodId, live.live, getBoardListings("backend", live.periodId).map((row) => row.id)],
+    [WEEK_34, true, ["lst_live"]],
   );
-
   const closed = resolveBoardPeriod(WEEK_33, MONDAY);
-  assert.equal(closed.periodId, WEEK_33);
-  assert.equal(closed.live, false);
   assert.deepEqual(
-    getBoardListings("backend", closed.periodId).map((row) => row.id),
-    ["lst_old"],
+    [closed.periodId, closed.live, getBoardListings("backend", closed.periodId).map((row) => row.id)],
+    [WEEK_33, false, ["lst_old"]],
   );
-
-  const future = resolveBoardPeriod("2026-W35", MONDAY);
-  assert.equal(future.periodId, WEEK_34);
-  assert.equal(future.live, true);
-
-  const junk = resolveBoardPeriod("not-a-week", MONDAY);
-  assert.equal(junk.periodId, WEEK_34);
+  assert.equal(resolveBoardPeriod("2026-W35", MONDAY).periodId, WEEK_34);
+  assert.equal(resolveBoardPeriod("not-a-week", MONDAY).periodId, WEEK_34);
   assert.equal(isClosedPeriod(WEEK_34, MONDAY), false);
   assert.equal(isClosedPeriod(WEEK_33, MONDAY), true);
 });
 
 function setCookieHeader(response: Response): string {
-  const raw = response.headers.get("set-cookie") ?? "";
-  return raw.split(";")[0] ?? "";
+  return (response.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
 }
 
-test("GET /out/:id increments public clicks and 302s to the canonical apply URL", async () => {
+test("GET /out/:id increments clicks, deduplicates a session, and 302s without query", async () => {
   seedPaid({
     id: "lst_click",
     company: "Acme",
     bidUsd: 5,
-    applyUrl: "https://jobs.example.com/acme",
-    clicks: 0,
+    applyUrl: "https://Jobs.Example.com:443/acme/?utm_source=x#frag",
     createdAt: "2026-08-17T09:00:00.000Z",
   });
   assert.equal(applyClickPath("lst_click"), "/out/lst_click");
 
-  const response = await getClick(
-    new Request("http://localhost/out/lst_click"),
-    { params: { id: "lst_click" } },
-  );
-  assert.equal(response.status, 302);
-  assert.equal(response.headers.get("location"), "https://jobs.example.com/acme");
-  assert.doesNotMatch(response.headers.get("location") ?? "", /[?#]/);
+  const first = await getClick(new Request("http://localhost/out/lst_click"), {
+    params: Promise.resolve({ id: "lst_click" }),
+  });
+  assert.equal(first.status, 302);
+  assert.equal(first.headers.get("location"), "https://jobs.example.com/acme");
+  assert.match(setCookieHeader(first), /^rj_click=/);
   assert.equal(defaultBoardStore.getById("lst_click")?.clicks, 1);
 
-  const again = await getClick(
-    new Request("http://localhost/out/lst_click"),
-    { params: Promise.resolve({ id: "lst_click" }) },
-  );
-  assert.equal(again.status, 302);
-  assert.equal(again.headers.get("location"), "https://jobs.example.com/acme");
-  assert.equal(defaultBoardStore.getById("lst_click")?.clicks, 2);
-});
-
-test("same session cookie does not increment the same listing again within 10 minutes", async () => {
-  seedPaid({
-    id: "lst_once",
-    company: "Acme",
-    bidUsd: 5,
-    applyUrl: "https://jobs.example.com/acme",
-    createdAt: "2026-08-17T09:00:00.000Z",
-  });
-
-  const first = await getClick(new Request("http://localhost/out/lst_once"), {
-    params: { id: "lst_once" },
-  });
-  const cookie = setCookieHeader(first);
-  assert.match(cookie, /^rj_click=/);
-  assert.equal(defaultBoardStore.getById("lst_once")?.clicks, 1);
-
   const refresh = await getClick(
-    new Request("http://localhost/out/lst_once", {
-      headers: { cookie },
+    new Request("http://localhost/out/lst_click", {
+      headers: { cookie: setCookieHeader(first) },
     }),
-    { params: { id: "lst_once" } },
+    { params: Promise.resolve({ id: "lst_click" }) },
   );
   assert.equal(refresh.status, 302);
   assert.equal(refresh.headers.get("location"), "https://jobs.example.com/acme");
-  assert.equal(defaultBoardStore.getById("lst_once")?.clicks, 1);
+  assert.equal(defaultBoardStore.getById("lst_click")?.clicks, 1);
+
+  const otherSession = await getClick(new Request("http://localhost/out/lst_click"), {
+    params: Promise.resolve({ id: "lst_click" }),
+  });
+  assert.equal(otherSession.status, 302);
+  assert.equal(defaultBoardStore.getById("lst_click")?.clicks, 2);
+  assert.doesNotMatch(otherSession.headers.get("location") ?? "", /[?#]/);
 });
 
-test("click hop strips leftover tracking and never adds query params", async () => {
+test("GET /out/:id treats malformed click-cookie encoding as empty history", async () => {
   seedPaid({
-    id: "lst_dirty",
-    company: "Beta",
-    bidUsd: 7,
-    applyUrl: "https://Jobs.Example.com:443/beta/?utm_source=x&fbclid=1#frag",
+    id: "lst_malformed_cookie",
+    company: "Acme",
+    bidUsd: 5,
+    applyUrl: "https://jobs.example.com/malformed-cookie",
     createdAt: "2026-08-17T09:00:00.000Z",
   });
-
   const response = await getClick(
-    new Request("http://localhost/out/lst_dirty"),
-    { params: { id: "lst_dirty" } },
+    new Request("http://localhost/out/lst_malformed_cookie", {
+      headers: { cookie: "rj_click=%" },
+    }),
+    { params: Promise.resolve({ id: "lst_malformed_cookie" }) },
   );
   assert.equal(response.status, 302);
-  assert.equal(response.headers.get("location"), "https://jobs.example.com/beta");
-  assert.doesNotMatch(response.headers.get("location") ?? "", /utm_|fbclid|[?#]/);
+  assert.equal(response.headers.get("location"), "https://jobs.example.com/malformed-cookie");
+  assert.equal(defaultBoardStore.getById("lst_malformed_cookie")?.clicks, 1);
 });
 
-test("unknown listing click is 404 not_found", async () => {
+test("unknown listing click is a 404 and does not invent a redirect", async () => {
   const missing = await getClick(new Request("http://localhost/out/missing"), {
-    params: { id: "missing" },
+    params: Promise.resolve({ id: "missing" }),
   });
   assert.equal(missing.status, 404);
   assert.deepEqual(await missing.json(), { code: "not_found" });
 });
 
-test("click count is public on the card and Apply uses /out/:id", () => {
-  const listing = rankListings([
-    fixtureListing({
-      id: "lst_card",
-      company: "Acme",
-      title: "Staff Backend Engineer",
-      bidUsd: 21,
-      clicks: 9,
-      createdAt: "2026-08-17T10:00:00.000Z",
-    }),
-  ])[0];
-  assert.ok(listing);
-  const html = renderToStaticMarkup(
-    createElement(ListingCard, { listing }),
-  );
-  assert.match(html, /9 clicks/);
-  assert.match(html, /data-clicks=""/);
-  assert.match(html, /href="\/out\/lst_card"/);
-  assert.match(html, /data-apply-url="https:\/\/jobs.example.com\/acme"/);
-  assert.match(html, /data-take-apply=""/);
-  assert.match(html, /data-apply-live=""/);
-  assert.match(html, /data-apply-after-identity=""/);
-  assert.match(html, /data-first-click="apply"/);
-  assert.match(html, /data-apply-after-list-first=""/);
-  assert.match(html, /data-apply-after-list-two=""/);
-  assert.match(html, /data-apply-after-list-three=""/);
-  assert.match(html, /data-apply-after-list-four=""/);
-  assert.match(html, /data-apply-after-list-five=""/);
-  assert.match(html, /data-apply-after-list-six=""/);
-  assert.doesNotMatch(html, /utm_/);
-});
-
-test("closed-week board is read-only history of that period", () => {
+test("closed empty weeks are read-only and keep live claim controls out", () => {
   const html = renderToStaticMarkup(
     createElement(Board, {
       lane: "backend",
       periodId: WEEK_33,
-      nextResetAt: "2026-08-24T00:00:00.000Z",
+      nextResetAt: RESET_FOR_TEST,
       listings: [],
       live: false,
     }),
   );
-  assert.match(html, /data-period="2026-W33"/);
   assert.match(html, /data-period-live="false"/);
   assert.match(html, /Closed week history 2026-W33 — read only/);
-  assert.doesNotMatch(html, /Period 2026-W33\. Next reset/);
-  assert.doesNotMatch(html, /Next reset 2026-08-24T00:00:00\.000Z/);
-  assert.match(html, /class="empty-lane-kicker">Closed week history</);
-  assert.doesNotMatch(html, /class="empty-lane-kicker">Closed week</);
-  assert.match(html, /Week 2026-W33 is read-only week history/);
-  assert.doesNotMatch(
-    html,
-    /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/,
-  );
-  assert.doesNotMatch(html, /data-week-window="rolling-7d"/);
-  assert.doesNotMatch(
-    html,
-    /Rolling last 7 days from paid placement\. Week 2026-W33 is an audit label/,
-  );
-  assert.match(html, /period=2026-W33/);
   assert.match(html, /data-empty-closed="true"/);
-  assert.match(html, /data-empty-honest=""/);
   assert.match(html, /Bids are closed in closed week history/);
-  assert.doesNotMatch(html, /Bids are closed\./);
-  assert.match(html, /No listings in closed week history/);
-  assert.match(html, /Closed week history was empty/);
-  assert.doesNotMatch(html, /This lane was empty/);
-  assert.doesNotMatch(html, /No listings this period/);
-  assert.match(html, /data-live-week=""/);
-  assert.match(html, /href="\/\?lane=backend"/);
-  assert.match(
-    html,
-    /Open the live Backend wall for the rolling last 7 days from paid placement/,
-  );
-  assert.doesNotMatch(html, /Open this week/);
-  assert.doesNotMatch(html, /Pay \$5 to list/);
-  assert.doesNotMatch(html, /Empty bay/);
-  assert.doesNotMatch(html, /data-empty-bay-list/);
-  assert.doesNotMatch(html, /data-empty-identity/);
-  assert.doesNotMatch(html, /data-empty-identity-first/);
-  assert.doesNotMatch(html, /data-bid-form/);
-  assert.doesNotMatch(html, />Outbid</);
-  assert.doesNotMatch(html, /data-list-role/);
-  assert.doesNotMatch(html, /List a role/);
-  assert.doesNotMatch(html, /data-one-identity/);
-  assert.doesNotMatch(html, /data-list-after-apply/);
-  assert.doesNotMatch(html, /data-list-after-apply-first/);
-  assert.doesNotMatch(html, /data-list-after-apply-two/);
-  assert.doesNotMatch(html, /data-list-after-apply-three/);
-  assert.doesNotMatch(html, /data-list-after-apply-four/);
-  assert.doesNotMatch(html, /data-list-after-apply-five/);
-  assert.doesNotMatch(html, /data-list-after-apply-six/);
-  assert.doesNotMatch(html, /data-list-after-apply-seven/);
-  assert.doesNotMatch(html, /after Apply/);
-  assert.doesNotMatch(html, /data-list-after-apply-eight/);
-  assert.doesNotMatch(html, /data-apply-after-list-seven/);
-  assert.doesNotMatch(html, /data-first-click="apply"/);
-  assert.doesNotMatch(html, /data-apply-after-list-first/);
-  assert.doesNotMatch(html, /data-apply-after-list-two/);
-  assert.doesNotMatch(html, /data-apply-after-list-three/);
-  assert.doesNotMatch(html, /data-apply-after-list-four/);
-  assert.doesNotMatch(html, /data-apply-after-list-five/);
-  assert.doesNotMatch(html, /data-apply-after-list-six/);
-  assert.doesNotMatch(html, /data-prize-title/);
-  assert.doesNotMatch(html, /data-later-fact/);
-  assert.doesNotMatch(html, /data-later-quiet/);
-  assert.doesNotMatch(html, /data-later-pack/);
-  assert.doesNotMatch(html, /data-prize-pack/);
-  assert.doesNotMatch(html, /data-later-role/);
-  assert.doesNotMatch(html, /data-apply-later-outlined/);
-  assert.doesNotMatch(html, /class="later-apply"/);
-  assert.doesNotMatch(html, /data-empty-claim/);
-  assert.doesNotMatch(html, /data-first-click="claim"/);
-  assert.doesNotMatch(html, /Claim #1 for/);
-  assert.doesNotMatch(html, /autofocus/i);
-  assert.doesNotMatch(html, /<select[^>]*name="lane"/);
-  assert.match(html, /wall-rail/);
-  assert.match(html, /wall-plate/);
-  assert.match(html, /class="wall-rail-kicker">Closed week history</);
-  assert.match(html, /aria-label="Closed week history"/);
-  assert.ok(
-    html.indexOf(">Backend week history<") >= 0,
-    "closed empty function plates must name closed week history, not live Function lanes",
-  );
-  assert.match(html, /data-lane="backend"[^>]*>Backend week history</);
-  assert.match(html, /data-lane="founding"[^>]*>Founding week history</);
-  assert.equal((html.match(/week history<\/a>/g) ?? []).length, 8);
-  assert.doesNotMatch(html, /data-lane="backend"[^>]*>Backend</);
-  assert.doesNotMatch(html, /class="wall-rail-kicker">Function lanes</);
-  assert.doesNotMatch(html, /aria-label="Function lanes"/);
-  assert.doesNotMatch(html, /Function lanes/);
-  assert.doesNotMatch(html, /data-listing-card/);
-  assert.doesNotMatch(html, /href="\/out\//);
-  assert.doesNotMatch(html, />Apply</);
-  assert.doesNotMatch(html, /data-unpaid-off|data-paid-only-wall/);
+  assert.match(html, /Open the live Backend wall for the rolling last 7 days/);
+  assert.match(html, /class="wall-rail"/);
+  assert.match(html, /Backend week history/);
+  assert.doesNotMatch(html, /data-bid-form|>Outbid<|data-empty-bay-list|data-first-click/);
 });
 
-test("closed-week occupied board stays history and still has no checkout", () => {
+test("closed occupied weeks keep paid cards and facts but no live checkout", () => {
   const listings = rankListings([
     fixtureListing({
       id: "lst_old",
@@ -506,106 +530,16 @@ test("closed-week occupied board stays history and still has no checkout", () =>
       live: false,
     }),
   );
-  assert.match(html, /data-period-live="false"/);
   assert.match(html, /Closed week history 2026-W33 — read only/);
-  assert.doesNotMatch(html, /Period 2026-W33\. Next reset/);
-  assert.doesNotMatch(html, /Next reset 2026-08-24T00:00:00\.000Z/);
-  assert.match(html, /Closed week/);
-  assert.match(html, /Week 2026-W33 is read-only week history/);
-  assert.doesNotMatch(
-    html,
-    /This week(?:'|&#x27;|&apos;)s remote \(global\) Backend wall/,
-  );
-  assert.match(html, /aria-label="Closed week history #1"/);
-  assert.match(html, /aria-label="Later ranks in closed week history"/);
-  assert.doesNotMatch(html, /This week(?:'|&#x27;|&apos;)s #1/);
-  assert.doesNotMatch(html, /Later ranks this week/);
-  assert.doesNotMatch(html, /wall is the rolling last 7 days from paid placement/);
-  assert.doesNotMatch(html, /aria-label="Rolling last 7 days #1"/);
-  assert.doesNotMatch(html, /Later ranks in the rolling last 7 days/);
-  assert.match(html, /data-listing-card/);
-  assert.match(html, /\$21/);
-  assert.match(html, />Apply</);
+  assert.match(html, /data-prize-title=""/);
+  assert.match(html, /data-later-pack=""/);
   assert.match(html, /href="\/out\/lst_old"/);
   assert.match(html, /href="\/out\/lst_old_later"/);
-  assert.match(html, /data-rank="2"/);
-  assert.doesNotMatch(html, /data-empty-lane/);
-  assert.doesNotMatch(html, /Pay \$5 to list/);
-  assert.doesNotMatch(html, /data-bid-form/);
-  assert.doesNotMatch(html, />Outbid</);
-  assert.doesNotMatch(html, /data-take-apply/);
-  assert.doesNotMatch(html, /data-apply-live/);
-  assert.doesNotMatch(html, /data-apply-after-identity/);
-  assert.doesNotMatch(html, /data-later-apply/);
-  assert.doesNotMatch(html, /data-apply-later/);
-  assert.doesNotMatch(html, /data-apply-later-outlined/);
-  assert.doesNotMatch(html, /data-list-role/);
-  assert.doesNotMatch(html, /List a role/);
-  assert.doesNotMatch(html, /data-first-click="claim"/);
-  assert.doesNotMatch(html, /<select[^>]*name="lane"/);
-  assert.match(html, /wall-rail/);
-  assert.match(html, /wall-plate/);
-  assert.ok(
-    html.indexOf('class="wall-rail-kicker">Closed week history') >= 0,
-    "closed occupied function-rail must name closed week history, not generic Function lanes",
-  );
-  assert.ok(
-    html.indexOf(">Backend week history<") >= 0,
-    "closed occupied function plates must name closed week history, not live Function lanes",
-  );
-  assert.match(html, /class="wall-rail-kicker">Closed week history</);
-  assert.match(html, /aria-label="Closed week history"/);
   assert.match(html, /data-lane="backend"[^>]*>Backend week history</);
-  assert.match(html, /data-lane="founding"[^>]*>Founding week history</);
-  assert.equal((html.match(/week history<\/a>/g) ?? []).length, 8);
-  assert.doesNotMatch(html, /data-lane="backend"[^>]*>Backend</);
-  assert.doesNotMatch(html, /class="wall-rail-kicker">Function lanes</);
-  assert.doesNotMatch(html, /aria-label="Function lanes"/);
-  assert.doesNotMatch(html, /Function lanes/);
-  assert.ok(html.indexOf("wall-rail") < html.indexOf("data-prize-title"));
-  assert.ok(html.indexOf("wall-rail") < html.indexOf(">Apply<"));
-  assert.doesNotMatch(html, /data-one-identity/);
-  assert.doesNotMatch(html, /data-list-after-apply/);
-  assert.doesNotMatch(html, /data-list-after-apply-first/);
-  assert.doesNotMatch(html, /data-list-after-apply-two/);
-  assert.doesNotMatch(html, /data-list-after-apply-three/);
-  assert.doesNotMatch(html, /data-list-after-apply-four/);
-  assert.doesNotMatch(html, /data-list-after-apply-five/);
-  assert.doesNotMatch(html, /data-list-after-apply-six/);
-  assert.doesNotMatch(html, /data-list-after-apply-seven/);
-  assert.doesNotMatch(html, /after Apply/);
-  assert.doesNotMatch(html, /data-list-after-apply-eight/);
-  assert.doesNotMatch(html, /data-apply-after-list-seven/);
-  assert.doesNotMatch(html, /data-first-click="apply"/);
-  assert.doesNotMatch(html, /data-apply-after-list-first/);
-  assert.doesNotMatch(html, /data-apply-after-list-two/);
-  assert.doesNotMatch(html, /data-apply-after-list-three/);
-  assert.doesNotMatch(html, /data-apply-after-list-four/);
-  assert.doesNotMatch(html, /data-apply-after-list-five/);
-  assert.doesNotMatch(html, /data-apply-after-list-six/);
-  assert.match(html, /data-prize-title=""/);
-  assert.equal((html.match(/data-prize-title=""/g) ?? []).length, 1);
-  assert.match(html, /data-later-fact=""/);
-  assert.equal((html.match(/data-later-fact=""/g) ?? []).length, 1);
-  assert.match(html, /data-later-quiet=""/);
-  assert.equal((html.match(/data-later-quiet=""/g) ?? []).length, 1);
-  assert.match(html, /data-prize-pack=""/);
-  assert.equal((html.match(/data-prize-pack=""/g) ?? []).length, 1);
-  assert.match(html, /data-later-pack=""/);
-  assert.equal((html.match(/data-later-pack=""/g) ?? []).length, 1);
-  assert.match(html, /data-later-role=""/);
-  assert.equal((html.match(/data-later-role=""/g) ?? []).length, 1);
-  assert.match(html, /class="later-apply"/);
-  assert.equal((html.match(/class="later-apply"/g) ?? []).length, 1);
-  assert.doesNotMatch(html.slice(html.indexOf('data-listing-id="lst_old_later"')), /data-prize-title/);
-  assert.doesNotMatch(html.slice(html.indexOf('data-listing-id="lst_old_later"')), /data-later-fact/);
-  assert.doesNotMatch(html.slice(html.indexOf('data-listing-id="lst_old_later"')), /class="title"|class="card job-sheet"|class="apply"/);
-  assert.doesNotMatch(html.slice(0, html.indexOf('data-listing-id="lst_old_later"')), /data-later-quiet|class="later-apply"/);
-  assert.ok(html.indexOf("data-prize-pack") < html.indexOf("data-later-pack"));
-  assert.doesNotMatch(html, /data-unpaid-off|data-paid-only-wall/);
+  assert.doesNotMatch(html, /data-bid-form|>Outbid<|data-list-role|data-first-click="apply"/);
 });
 
-test("closed-week unpaid rows stay off the wall — no invented occupancy", () => {
+test("closed-week unpaid rows stay off the wall", () => {
   const html = renderToStaticMarkup(
     createElement(Board, {
       lane: "backend",
@@ -615,7 +549,6 @@ test("closed-week unpaid rows stay off the wall — no invented occupancy", () =
         fixtureListing({
           id: "lst_old_unpaid",
           company: "Ghost",
-          title: "Unpaid Staff Engineer",
           bidUsd: 21,
           paidUsd: 0,
           periodId: WEEK_33,
@@ -627,19 +560,5 @@ test("closed-week unpaid rows stay off the wall — no invented occupancy", () =
   );
   assert.match(html, /data-empty-closed="true"/);
   assert.match(html, /data-empty-honest=""/);
-  assert.match(html, /Bids are closed in closed week history/);
-  assert.doesNotMatch(html, /Bids are closed\./);
-  assert.match(
-    html,
-    /Open the live Backend wall for the rolling last 7 days from paid placement/,
-  );
-  assert.doesNotMatch(html, /Open this week/);
-  assert.match(html, /wall-rail/);
-  assert.doesNotMatch(html, /data-listing-card/);
-  assert.doesNotMatch(html, /data-prize-title/);
-  assert.doesNotMatch(html, /Ghost|Unpaid Staff Engineer/);
-  assert.doesNotMatch(html, />Apply</);
-  assert.doesNotMatch(html, /data-first-click="apply"/);
-  assert.doesNotMatch(html, /data-bid-form/);
-  assert.doesNotMatch(html, /data-unpaid-off|data-paid-only-wall/);
+  assert.doesNotMatch(html, /data-listing-card|Ghost|>Apply<|data-bid-form/);
 });

@@ -6,9 +6,9 @@
 **Market:** Global English, USD, remote-only  
 **Clone of:** [outbid.lol](https://outbid.lol/) ranking mechanics, applied to remote job posts
 
-Public weekly auction for the #1 remote job in a function lane. Rank is the bid — nothing else. Candidates come to watch who is paying to hire.
+Public rolling auction for the #1 remote job in a function lane. Live rank is the rolling last 7 days from paid placement. ISO weekId is audit-only; Monday 00:00 UTC does not drop live rank. Rank is the bid — nothing else. Candidates come to watch who is paying to hire.
 
-One-line pitch: **Companies bid USD to stand first on this week's remote Backend / Growth / Design board.**
+One-line pitch: **Companies bid USD to stand first on the rolling last 7 days of a remote Backend / Growth / Design board.**
 
 ---
 
@@ -32,7 +32,7 @@ Currency is **USD**. Copy is **English**. The market is **global remote**. There
 - Same apply URL or company handle can raise; the owner pays only the difference. A different payer cannot steal that rank by paying only the difference.
 - Live rank is the rolling last 7 days from paid placement (not Monday 00:00 UTC, not a 24h lock). `periodId` / weekId is an ISO-week audit label. Architecture must allow a daily flag later without rewriting rank.
 - Apply-URL clicks are counted and public.
-- Polar is Merchant of Record in live. Tests use a fixture checkout. No live Polar in CI.
+- Waffo Pancake is the sole Merchant of Record in live. Tests use an explicit fixture checkout. No live Waffo in CI.
 - Pages: board, about, rules, checkout return.
 - Listing is a remote job: title, function lane, company, apply URL, optional salary band. Never invent a salary.
 
@@ -66,7 +66,7 @@ These rules are the product. UI and payments exist to make them visible and enfo
 | Cannot steal the difference | A different checkout identity cannot raise listing A by paying only `newBid − A.bid`. They must pay the **full** new bid as a new listing (or fail `raise_not_owner`). They cannot inherit A’s paid amount. |
 | Raise to take #1 | To become #1, `newBid` must be **≥ currentTopBid + 1**. Equal to the top bid is not enough (older keeps the higher rank). |
 | Period | Live rank is computed among paid listings whose `createdAt` (paid placement) falls in the **rolling last 7 days**. ISO `periodId` is an audit label. Closed weekIds remain history at `?period=`. |
-| Payment claims rank | An unpaid or abandoned checkout does not appear. Rank updates only after a completed payment (live Polar or fixture). |
+| Payment claims rank | An unpaid or abandoned checkout does not appear. Rank updates only after a completed payment (signed live Waffo event or explicit fixture). |
 
 Worked examples:
 
@@ -162,25 +162,33 @@ Clicks: `GET /out/:listingId` increments `clicks` by 1 (at-most-once per session
 
 | Mode | When | Behavior |
 |---|---|---|
-| Fixture | tests, CI, `POLAR_FIXTURE_ONLY=1` | `FakePolarPort` records a completed checkout in-process. No network. |
-| Live Polar | `POLAR_LIVE=1` and fixture override unset | Polar Checkout, Polar is Merchant of Record. |
+| Fixture | tests, CI, `WAFFO_MODE=fixture` | `FakePolarPort` compatibility port records a completed checkout in-process. No network. |
+| Waffo test | explicit `WAFFO_MODE=waffo-test` | Official Pancake SDK test checkout and signed test `order.completed` webhook. |
+| Waffo prod | explicit `WAFFO_MODE=waffo-prod` | Official Pancake SDK production checkout and signed prod `order.completed` webhook. |
 
 Live env (documented in `.env.example` when the app exists; never committed with secrets):
 
-- `POLAR_ACCESS_TOKEN`
-- `POLAR_WEBHOOK_SECRET`
-- `POLAR_PRODUCT_ID` or equivalent Polar product for a custom USD amount
-- `POLAR_SUCCESS_URL` → `/return?checkoutId=…`
+- `WAFFO_MODE` (`fixture`, `waffo-test`, or `waffo-prod`)
+- `WAFFO_MERCHANT_ID`
+- `WAFFO_PRIVATE_KEY` or `WAFFO_PRIVATE_KEY_FILE`
+- `WAFFO_STORE_ID`
+- `WAFFO_PRODUCT_ID`
+- `WAFFO_PUBLIC_BASE_URL` (HTTPS in prod)
+- `WAFFO_WEBHOOK_TEST_PUBLIC_KEY` / `WAFFO_WEBHOOK_PROD_PUBLIC_KEY`
+- `DATABASE_PATH` (durable SQLite in test/prod modes)
 
 Rules:
 
 - Charge amount is the **first bid** or the **raise difference**, in whole USD.
-- Rank changes only after Polar reports paid (webhook) or the fixture marks paid.
+- Persist the complete immutable intent before calling Waffo. An ambiguous transport/5xx or invalid response remains recoverable as `unknown`; it is never released as paid.
+- Rank changes only after a verified Waffo `order.completed` with the expected mode, store, product, identity, USD amount, and exact metadata (or the explicit fixture marks paid).
+- Webhook money is parsed as decimal strings: when present, `subtotal` must equal the immutable intent charge; `amount` may equal that subtotal or the tax-inclusive total, and a present `total` must equal `subtotal + tax`. Without a subtotal, tax must be explicitly zero and `amount` must equal the charge. Malformed or inconsistent present values are rejected/reconciled, and tax never inflates the ranked bid.
 - Abandoned checkout: no listing row (or a `pending` row that the board never shows).
-- Refunds / chargebacks: listing is removed from the live period; ranks recompute. Documented, not silent.
-- `POLAR_FIXTURE_ONLY=1` always wins over `POLAR_LIVE=1`. CI never sets live Polar.
+- Captured payments outside the rolling window become durable `needs_reconciliation`; they never rank stale occupancy.
+- `event.id`, business event, payment, order, and intent identities are unique. Exact signed retries are no-ops; changed replays are rejected. Atomic internal failures return retryable 5xx and leave the event retryable.
+- Browser return is informational and never settles a live listing. Fixture mode is explicit and cannot self-settle in a production runtime.
 
-There is no API-key product and no revenue share with the hiring company. Polar’s MoR fee is the operator’s cost.
+There is no API-key product and no revenue share with the hiring company. Waffo’s MoR fee is the operator’s cost.
 
 ---
 
@@ -190,7 +198,7 @@ There is no API-key product and no revenue share with the hiring company. Polar�
 |---|---|
 | `/` | Board. Lane tabs. One apply-URL (or handle) field, amount field, **Outbid** button. Ranked cards: rank, title, company, **$bid**, public **clicks**. |
 | `/about` | What this is: no ads, no API keys, no revenue share. Rank is the bid. Global remote, English, USD. |
-| `/rules` | Normative ranking, min/max, raise-the-difference, weekly reset, URL rules, no chat/NSFW, no invented salaries. |
+| `/rules` | Normative ranking, min/max, raise-the-difference, rolling placement window and ISO audit weekId, URL rules, no chat/NSFW, no invented salaries. |
 | `/return` | Checkout return. Success → “you’re on the board” + link home. Cancel → no rank claimed. |
 
 Board chrome clones outbid.lol: one input row, amount, Outbid, then a stacked leaderboard of cards. No extra marketing widgets on `/`.
@@ -219,7 +227,7 @@ Machine `code` plus HTTP status. No stack traces on the wire.
 | `salary_invalid` | 422 | partial band, min > max, or non-integer |
 | `period_closed` | 409 | bid on a non-current period |
 | `payment_required` | 402 | checkout not completed |
-| `payment_failed` | 402 | Polar / fixture reported failure |
+| `payment_failed` | 402 | Waffo / fixture reported failure |
 | `not_found` | 404 | listing or period missing |
 
 Salary must not be coerced into a valid band. Garbage or a single bound → `salary_invalid` or omit; never invent the other bound.
@@ -228,13 +236,13 @@ Salary must not be coerced into a valid band. Garbage or a single bound → `sal
 
 ## 10. Live-smoke flows
 
-Operator-only. `scripts/live-smoke.sh` is **not** called from `scripts/test.sh` or Actions. Local process, `POLAR_LIVE=1`, fixture override unset. Missing Polar secrets → `BLOCKED-SECRET` with the env var name. Each flow is `PASS`, `PASS-ERROR` (documented code), or `FAIL`.
+Operator-only. `scripts/live-smoke.sh` is **not** called from `scripts/test.sh` or Actions. It starts an explicit local `WAFFO_MODE=fixture` process and never invokes a provider. Authorized post-deploy Waffo smoke is a separate runbook with the required merchant, key, store, product, HTTPS URL, and durable database configuration. Missing live configuration is `BLOCKED-SECRET` / `BLOCKED-CONFIG` with the env var name. Each flow is `PASS`, `PASS-ERROR` (documented code), or `FAIL`.
 
 | # | Flow | Expected |
 |---|---|---|
 | 1 | `GET /` | 200, lane tabs, Outbid control, no invented listings |
-| 2 | `GET /about` and `GET /rules` | 200, state min $5, weekly reset, rank = bid |
-| 3 | New listing, valid remote job, bid $5 | Polar Checkout session (or `BLOCKED-SECRET`) |
+| 2 | `GET /about` and `GET /rules` | 200, state min $5, rolling placement window, ISO audit weekId, rank = bid |
+| 3 | New listing, valid remote job, bid $5 | Fixture checkout in the offline smoke; authorized Waffo Checkout session or `BLOCKED-CONFIG` in a deployment smoke |
 | 4 | Fixture or completed live return | listing visible at the rank that $5 takes |
 | 5 | Raise same apply URL to $8 | charged **$3**; same `id`; rank recomputed |
 | 6 | Other payer, same URL, difference only | `raise_not_owner` or `identity_taken`; original rank unchanged |
@@ -282,4 +290,4 @@ Full process: [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 Implementation plan (stack, modules, PR DAG): [BUILD.md](./BUILD.md).
 
-Until there is an application binary, `scripts/test.sh` still has to pass: contract files exist, SPEC/CONTRIBUTING agree, no tracked secrets. Adding the Next.js app means **extending** that script with unit/contract tests. Live Polar is optional and must not be required for `main` to stay green.
+Until there is an application binary, `scripts/test.sh` still has to pass: contract files exist, SPEC/CONTRIBUTING agree, no tracked secrets. Adding the Next.js app means **extending** that script with unit/contract tests. Live Waffo is optional and must not be required for `main` to stay green.

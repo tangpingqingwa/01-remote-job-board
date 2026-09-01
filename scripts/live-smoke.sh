@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Operator smoke against a local Next.js process. Not called from scripts/test.sh or CI.
-# Walks SPEC §10. Fixture path is the default. Live Polar only if POLAR_LIVE=1
-# and secrets exist; otherwise BLOCKED-SECRET with the exact env var.
+# Walks SPEC §10 against a disposable local process in explicit Waffo fixture
+# mode. This offline smoke never invokes a payment provider.
 # Next.js webpack cannot load node:crypto via the client bid form, so this
 # process serves the same App Router handlers through tsx (not next dev).
 set -euo pipefail
@@ -19,6 +19,9 @@ if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
 fi
 if [[ "${CI:-}" == "true" ]]; then
   fail "live-smoke refuses CI=true"
+fi
+if [[ -n "${LIVE_SMOKE_BASE:-}" ]]; then
+  fail "LIVE_SMOKE_BASE is unsupported; offline smoke always starts a local fixture process"
 fi
 
 command -v curl >/dev/null || fail "curl is required"
@@ -41,16 +44,11 @@ WEEK_PID=""
 LIVE_PID=""
 WORKDIR=""
 RESULT_LOG=""
-BASE="${LIVE_SMOKE_BASE:-}"
+BASE=""
 
-# Capture operator Polar flags before the fixture process unsets them.
-OP_POLAR_LIVE="${POLAR_LIVE:-}"
-OP_POLAR_ACCESS_TOKEN="${POLAR_ACCESS_TOKEN:-}"
-OP_POLAR_WEBHOOK_SECRET="${POLAR_WEBHOOK_SECRET:-}"
-OP_POLAR_PRODUCT_ID="${POLAR_PRODUCT_ID:-}"
-OP_POLAR_FIXTURE_ONLY="${POLAR_FIXTURE_ONLY:-}"
-OP_POLAR_API_BASE="${POLAR_API_BASE:-}"
-OP_POLAR_SUCCESS_URL="${POLAR_SUCCESS_URL:-}"
+# The only operator mode supported by this offline script is the explicit
+# fixture. Authorized Waffo test/prod smoke belongs to a deployment runbook.
+OP_WAFFO_MODE="${WAFFO_MODE:-}"
 
 kill_tree() {
   local pid="${1:-}"
@@ -323,8 +321,13 @@ start_smoke_server() {
   shift 3
   (
     cd "$root"
-    unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_PRODUCT_ID || true
-    export POLAR_FIXTURE_ONLY=1
+    unset WAFFO_MODE WAFFO_MERCHANT_ID WAFFO_STORE_ID WAFFO_PRODUCT_ID WAFFO_PRIVATE_KEY WAFFO_PRIVATE_KEY_FILE \
+      WAFFO_PUBLIC_BASE_URL WAFFO_API_BASE WAFFO_WEBHOOK_PUBLIC_KEY \
+      WAFFO_WEBHOOK_TEST_PUBLIC_KEY WAFFO_WEBHOOK_PROD_PUBLIC_KEY DATABASE_PATH NODE_ENV \
+      POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_PRODUCT_ID \
+      POLAR_API_BASE POLAR_SUCCESS_URL POLAR_FIXTURE_ONLY || true
+    export WAFFO_MODE=fixture
+    export NODE_ENV=test
     export PORT="${port}"
     export PUBLIC_BASE_URL="http://127.0.0.1:${port}"
     while [[ $# -gt 0 ]]; do
@@ -504,27 +507,19 @@ echo "== live-smoke (operator only; not CI) =="
 echo "root=${root}"
 echo "weekId=${EXPECT_WEEK}"
 
-if [[ -z "${BASE}" ]]; then
-  PORT="${LIVE_SMOKE_PORT:-$(pick_port)}"
-  BASE="http://127.0.0.1:${PORT}"
-  LOG_PATH="${WORKDIR}/server.log"
-  echo "starting local fixture process on ${BASE}"
-  STARTED_PID="$(start_smoke_server "$PORT" "$LOG_PATH" "$SERVER_PATH" "POLAR_FIXTURE_ONLY=1")"
-  if ! wait_health "$BASE"; then
-    echo "server log:" >&2
-    cat "${LOG_PATH}" >&2 || true
-    fail "local server did not become healthy at ${BASE}/healthz"
-  fi
-else
-  BASE="${BASE%/}"
-  echo "assuming existing server at ${BASE}"
-  if ! wait_health "$BASE"; then
-    fail "existing server at ${BASE} did not answer /healthz"
-  fi
+PORT="${LIVE_SMOKE_PORT:-$(pick_port)}"
+BASE="http://127.0.0.1:${PORT}"
+LOG_PATH="${WORKDIR}/server.log"
+echo "starting local fixture process on ${BASE}"
+STARTED_PID="$(start_smoke_server "$PORT" "$LOG_PATH" "$SERVER_PATH" "WAFFO_MODE=fixture")"
+if ! wait_health "$BASE"; then
+  echo "server log:" >&2
+  cat "${LOG_PATH}" >&2 || true
+  fail "local server did not become healthy at ${BASE}/healthz"
 fi
 
 echo "base=${BASE}"
-echo "operator POLAR_LIVE=${OP_POLAR_LIVE:-<unset>}"
+echo "operator WAFFO_MODE=${OP_WAFFO_MODE:-<unset>} (offline fixture smoke)"
 
 # --- healthz ---
 health_body="${WORKDIR}/healthz.json"
@@ -542,15 +537,16 @@ if [[ "$board0_code" != "200" ]]; then
 elif ! html_has "$board0" 'data-lane-tabs' \
   || ! html_has "$board0" 'data-lane="backend"' \
   || ! html_has "$board0" 'data-bid-form' \
+  || ! html_has "$board0" 'Claim #1 for' \
   || ! html_has "$board0" 'Outbid' \
   || ! html_has "$board0" "data-period=\"${EXPECT_WEEK}\""; then
-  record "1-board" "FAIL" "GET / missing lane tabs, Outbid control, or period ${EXPECT_WEEK}"
+  record "1-board" "FAIL" "GET / missing lane tabs, Claim #1 lead, Outbid control, or period ${EXPECT_WEEK}"
 elif invented_listings "$board0"; then
   record "1-board" "FAIL" "GET / invented listings"
 elif [[ "$board0_count" == "0" ]] && html_has "$board0" 'data-empty-lane="true"'; then
-  record "1-board" "PASS" "GET / 200 lane tabs + Outbid; empty lane; no invented listings"
+  record "1-board" "PASS" "GET / 200 lane tabs + Claim #1/Outbid; empty lane; no invented listings"
 elif [[ "$board0_count" != "0" ]]; then
-  record "1-board" "PASS" "GET / 200 lane tabs + Outbid; ${board0_count} already-paid card(s) (not seeded by smoke)"
+  record "1-board" "PASS" "GET / 200 lane tabs + Claim #1/Outbid; ${board0_count} already-paid card(s) (not seeded by smoke)"
 else
   record "1-board" "FAIL" "GET / 200 but empty-lane contract broken"
 fi
@@ -562,95 +558,32 @@ rules_body="${WORKDIR}/rules.html"
 rules_code="$(http_get "$BASE" "/rules" "$rules_body" || true)"
 if [[ "$about_code" == "200" && "$rules_code" == "200" ]] \
   && html_has "$about_body" 'Rank is the bid' \
-  && html_has "$about_body" 'global remote' \
-  && html_has "$rules_body" '≥ \$5' \
-  && html_has "$rules_body" 'Monday 00:00' \
+  && html_has "$about_body" 'remote roles open to applicants across regions' \
+  && html_has "$about_body" 'not tied to a city' \
+  && html_has "$rules_body" '\$5' \
   && html_has "$rules_body" 'Rank is the bid' \
-  && html_has "$rules_body" 'weekly reset'; then
-  record "2-about-rules" "PASS" "GET /about and /rules 200; min \$5, weekly reset, rank = bid"
+  && html_has "$rules_body" 'Each paid placement remains eligible for seven days' \
+  && html_has "$rules_body" 'does not reset for everyone at Monday midnight' \
+  && ! html_has "$rules_body" 'weekId' \
+  && ! html_has "$rules_body" 'audit label'; then
+  record "2-about-rules" "PASS" "GET /about and /rules 200; min \$5 and rolling paid-placement rank"
 else
   record "2-about-rules" "FAIL" "about HTTP ${about_code} rules HTTP ${rules_code}"
 fi
 
-# --- SPEC §10.3 New listing $5: Polar session or BLOCKED-SECRET ---
-echo "== polar live checkout =="
-if [[ "${OP_POLAR_LIVE}" == "1" && "${OP_POLAR_FIXTURE_ONLY}" != "1" ]]; then
-  missing=""
-  if [[ -z "${OP_POLAR_ACCESS_TOKEN}" ]]; then
-    missing="POLAR_ACCESS_TOKEN"
-  elif [[ -z "${OP_POLAR_PRODUCT_ID}" ]]; then
-    missing="POLAR_PRODUCT_ID"
-  fi
-  if [[ -n "$missing" ]]; then
-    echo "BLOCKED-SECRET: ${missing}"
-    record "3-new-listing" "BLOCKED-SECRET" "${missing}"
-  else
-    live_port="$(pick_port)"
-    live_log="${WORKDIR}/polar-live.log"
-    live_base="http://127.0.0.1:${live_port}"
-    LIVE_PID="$(start_smoke_server "$live_port" "$live_log" "$SERVER_PATH" \
-      "POLAR_LIVE=1" \
-      "POLAR_ACCESS_TOKEN=${OP_POLAR_ACCESS_TOKEN}" \
-      "POLAR_WEBHOOK_SECRET=${OP_POLAR_WEBHOOK_SECRET:-}" \
-      "POLAR_PRODUCT_ID=${OP_POLAR_PRODUCT_ID}" \
-      "POLAR_API_BASE=${OP_POLAR_API_BASE}" \
-      "POLAR_SUCCESS_URL=${OP_POLAR_SUCCESS_URL}" \
-      "POLAR_FIXTURE_ONLY=")"
-    if ! wait_health "$live_base"; then
-      if grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' "${live_log}"; then
-        echo "BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
-        record "3-new-listing" "BLOCKED-SECRET" "POLAR_ACCESS_TOKEN"
-      elif grep -q 'BLOCKED-SECRET: POLAR_PRODUCT_ID' "${live_log}"; then
-        echo "BLOCKED-SECRET: POLAR_PRODUCT_ID"
-        record "3-new-listing" "BLOCKED-SECRET" "POLAR_PRODUCT_ID"
-      else
-        record "3-new-listing" "FAIL" "live Polar process did not become healthy"
-      fi
-    else
-      live_body="${WORKDIR}/live-checkout.body"
-      live_hdrs="${WORKDIR}/live-checkout.hdrs"
-      live_code="$(http_post_form "$live_base" "/checkout" "$live_body" "$live_hdrs" \
-        --data-urlencode "lane=backend" \
-        --data-urlencode "identity=https://live.example/job-${STAMP}" \
-        --data-urlencode "amount=5" || true)"
-      live_loc="$(header_value "$live_hdrs" "location" || true)"
-      live_board="${WORKDIR}/live-board.html"
-      http_get "$live_base" "/" "$live_board" >/dev/null || true
-      if html_has "$live_board" "live.example/job-${STAMP}"; then
-        record "3-new-listing" "FAIL" "unpaid live Polar session appeared on the board"
-      elif [[ "$live_code" =~ ^30[12378]$ && "$live_loc" == https://sandbox.polar.sh/* ]]; then
-        record "3-new-listing" "PASS" "live Polar sandbox Checkout URL; unpaid not listed"
-      elif [[ "$live_code" =~ ^30[12378]$ && "$live_loc" == https://*polar.sh* ]]; then
-        record "3-new-listing" "FAIL" "Polar checkout host is not sandbox.polar.sh: ${live_loc%%\?*}"
-      elif grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' "${live_log}" "$live_body" 2>/dev/null; then
-        echo "BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
-        record "3-new-listing" "BLOCKED-SECRET" "POLAR_ACCESS_TOKEN"
-      elif grep -q 'BLOCKED-SECRET: POLAR_PRODUCT_ID' "${live_log}" "$live_body" 2>/dev/null; then
-        echo "BLOCKED-SECRET: POLAR_PRODUCT_ID"
-        record "3-new-listing" "BLOCKED-SECRET" "POLAR_PRODUCT_ID"
-      else
-        record "3-new-listing" "PASS-ERROR" "POLAR_LIVE=1 HTTP ${live_code} loc=${live_loc}; no invented paid rank"
-      fi
-    fi
-    if [[ -n "${LIVE_PID}" ]]; then
-      kill_tree "${LIVE_PID}"
-      wait "${LIVE_PID}" 2>/dev/null || true
-    fi
-    LIVE_PID=""
-  fi
-else
-  if [[ -z "${OP_POLAR_ACCESS_TOKEN}" ]]; then
-    echo "BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
-    record "3-new-listing" "BLOCKED-SECRET" "POLAR_ACCESS_TOKEN"
-  elif [[ -z "${OP_POLAR_PRODUCT_ID}" ]]; then
-    echo "BLOCKED-SECRET: POLAR_PRODUCT_ID"
-    record "3-new-listing" "BLOCKED-SECRET" "POLAR_PRODUCT_ID"
-  else
-    record "3-new-listing" "PASS-ERROR" "POLAR_LIVE unset; secrets present but live Polar not invoked"
-  fi
+if grep -nEi 'weekly[[:space:]-]+reset' src/app/rules/page.tsx tests/pages.test.ts scripts/live-smoke.sh >/dev/null; then
+  fail "Rules and fixture smoke must not make an obsolete cadence claim"
 fi
 
-# Remaining §10 rows use the fixture process (allowed when live pay is blocked).
+# --- SPEC §10.3 New listing $5: explicit fixture checkout ---
+echo "== Waffo fixture checkout (offline) =="
+if [[ -n "${OP_WAFFO_MODE}" && "${OP_WAFFO_MODE}" != "fixture" ]]; then
+  record "3-new-listing" "BLOCKED-SECRET" "live Waffo mode is deployment-runbook-only; this smoke remains fixture-only"
+else
+  record "3-new-listing" "PASS-ERROR" "explicit WAFFO_MODE=fixture; no provider request is made"
+fi
+
+# Remaining §10 rows use the explicit fixture process.
 # Rank updates only after GET /return completes the fixture checkout.
 
 post_and_return() {
@@ -658,6 +591,8 @@ post_and_return() {
   local amount="$2"
   local tag="$3"
   local cookie="${4:-}"
+  local title="${5:-Backend Engineer}"
+  local company="${6:-Acme}"
   local body="${WORKDIR}/${tag}.body"
   local hdrs="${WORKDIR}/${tag}.hdrs"
   local code
@@ -666,12 +601,16 @@ post_and_return() {
       -H "cookie: ${cookie}" \
       --data-urlencode "lane=backend" \
       --data-urlencode "identity=${identity}" \
-      --data-urlencode "amount=${amount}" || true)"
+      --data-urlencode "amount=${amount}" \
+      --data-urlencode "title=${title}" \
+      --data-urlencode "company=${company}" || true)"
   else
     code="$(http_post_form "$BASE" "/checkout" "$body" "$hdrs" \
       --data-urlencode "lane=backend" \
       --data-urlencode "identity=${identity}" \
-      --data-urlencode "amount=${amount}" || true)"
+      --data-urlencode "amount=${amount}" \
+      --data-urlencode "title=${title}" \
+      --data-urlencode "company=${company}" || true)"
   fi
   local loc
   loc="$(header_value "$hdrs" "location" || true)"
@@ -694,7 +633,7 @@ complete_return() {
 }
 
 # --- SPEC §10.4 Fixture return: $5 lists at the rank it takes ---
-create_line="$(post_and_return "$TRACKED_URL" "5" "create")"
+create_line="$(post_and_return "$TRACKED_URL" "5" "create" "" "Backend Engineer" "Acme")"
 create_code="$(printf '%s' "$create_line" | cut -f1)"
 create_loc="$(printf '%s' "$create_line" | cut -f2)"
 create_err="$(printf '%s' "$create_line" | cut -f3)"
@@ -723,7 +662,7 @@ else
 fi
 
 # --- SPEC §10.5 Raise same apply URL to $8; charged $3; same id ---
-raise_line="$(post_and_return "$ACME_URL" "8" "raise" "${owner_cookie}")"
+raise_line="$(post_and_return "$ACME_URL" "8" "raise" "${owner_cookie}" "Backend Engineer" "Acme")"
 raise_code="$(printf '%s' "$raise_line" | cut -f1)"
 raise_loc="$(printf '%s' "$raise_line" | cut -f2)"
 raise_err="$(printf '%s' "$raise_line" | cut -f3)"
@@ -745,7 +684,7 @@ else
 fi
 
 # --- SPEC §10.6 Other payer, same URL, difference only ---
-stranger_line="$(post_and_return "$ACME_URL" "11" "stranger")"
+stranger_line="$(post_and_return "$ACME_URL" "11" "stranger" "" "Backend Engineer" "Other Employer")"
 stranger_code="$(printf '%s' "$stranger_line" | cut -f1)"
 stranger_loc="$(printf '%s' "$stranger_line" | cut -f2)"
 stranger_err="$(printf '%s' "$stranger_line" | cut -f3)"
@@ -763,7 +702,7 @@ else
 fi
 
 # --- SPEC §10.7 Second company, lower bid ---
-beta_line="$(post_and_return "$BETA_URL" "5" "beta")"
+beta_line="$(post_and_return "$BETA_URL" "5" "beta" "" "Growth Engineer" "Beta")"
 beta_code="$(printf '%s' "$beta_line" | cut -f1)"
 beta_chk="$(printf '%s' "$beta_line" | cut -f4)"
 if [[ "$beta_code" != "303" || -z "$beta_chk" ]]; then
@@ -789,13 +728,13 @@ else
 fi
 
 # --- SPEC §10.8 Two equal bids: older keeps the higher rank ---
-gamma_line="$(post_and_return "$GAMMA_URL" "5" "gamma")"
+gamma_line="$(post_and_return "$GAMMA_URL" "5" "gamma" "" "Data Engineer" "Gamma")"
 gamma_chk="$(printf '%s' "$gamma_line" | cut -f4)"
 delta_ok=0
 if [[ -n "$gamma_chk" ]]; then
   complete_return "$gamma_chk" "gamma" >/dev/null || true
   sleep 1
-  delta_line="$(post_and_return "$DELTA_URL" "5" "delta")"
+  delta_line="$(post_and_return "$DELTA_URL" "5" "delta" "" "Frontend Engineer" "Delta")"
   delta_chk="$(printf '%s' "$delta_line" | cut -f4)"
   if [[ -n "$delta_chk" ]]; then
     complete_return "$delta_chk" "delta" >/dev/null || true
@@ -830,11 +769,11 @@ else
 fi
 
 # --- SPEC §10.10 Telegram / Discord / NSFW ---
-tg_line="$(post_and_return "https://t.me/foo" "5" "telegram")"
+tg_line="$(post_and_return "https://t.me/foo" "5" "telegram" "" "Backend Engineer" "Telegram Employer")"
 tg_err="$(printf '%s' "$tg_line" | cut -f3)"
-dc_line="$(post_and_return "https://discord.gg/invite" "5" "discord")"
+dc_line="$(post_and_return "https://discord.gg/invite" "5" "discord" "" "Backend Engineer" "Discord Employer")"
 dc_err="$(printf '%s' "$dc_line" | cut -f3)"
-nsfw_line="$(post_and_return "https://onlyfans.com/x" "5" "nsfw")"
+nsfw_line="$(post_and_return "https://onlyfans.com/x" "5" "nsfw" "" "Backend Engineer" "NSFW Employer")"
 nsfw_err="$(printf '%s' "$nsfw_line" | cut -f3)"
 board10="${WORKDIR}/board10.html"
 http_get "$BASE" "/" "$board10" >/dev/null || true
@@ -896,7 +835,7 @@ week_old_port="$(pick_port)"
 week_old_log="${WORKDIR}/week-old.log"
 week_old_base="http://127.0.0.1:${week_old_port}"
 WEEK_PID="$(start_smoke_server "$week_old_port" "$week_old_log" "$SERVER_PATH" \
-  "POLAR_FIXTURE_ONLY=1" \
+  "WAFFO_MODE=fixture" \
   "BOARD_NOW=2026-08-16T23:59:59.999Z")"
 if ! wait_health "$week_old_base"; then
   record "13-rolling-week" "FAIL" "Sunday-week process did not become healthy"
@@ -907,7 +846,9 @@ else
     "$week_create_body" "$week_create_hdrs" \
     --data-urlencode "lane=backend" \
     --data-urlencode "identity=https://last-week.example/job-${STAMP}" \
-    --data-urlencode "amount=5" || true)"
+    --data-urlencode "amount=5" \
+    --data-urlencode "title=Backend Engineer" \
+    --data-urlencode "company=Last Week" || true)"
   week_loc="$(header_value "$week_create_hdrs" "location" || true)"
   week_chk="$(query_param "$week_loc" "checkoutId" || true)"
   week_return_code="000"

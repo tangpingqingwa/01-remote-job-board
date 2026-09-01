@@ -6,14 +6,21 @@ const CLICK_COOKIE = "rj_click";
 const CLICK_WINDOW_MS = 10 * 60 * 1000;
 
 type ClickContext = {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 };
 
 function cookieValue(request: Request, name: string): string | undefined {
   const cookie = request.headers.get("cookie") ?? "";
   const match = cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
   const value = match?.[1];
-  return value ? decodeURIComponent(value) : undefined;
+  if (!value) return undefined;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    // A stale or hand-edited cookie must not turn a valid apply click into a
+    // server error. Treat malformed encoding as an empty click history.
+    return undefined;
+  }
 }
 
 function recentClicks(raw: string | undefined): Record<string, number> {
@@ -54,6 +61,9 @@ export async function GET(
   const listing = defaultBoardStore.getById(id);
   if (!listing) {
     return NextResponse.json({ code: "not_found" }, { status: 404 });
+  }
+  if (!listing.applyUrl) {
+    return NextResponse.json({ code: "apply_url_unavailable" }, { status: 410 });
   }
 
   const nowMs = Date.now();

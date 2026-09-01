@@ -1,4 +1,5 @@
 import { applyClickPath } from "../../lib/clicks";
+import { laneLabel } from "../../lib/board";
 import { isPaidListing } from "../../lib/rank";
 import type { RankedListing } from "../../lib/types";
 
@@ -21,6 +22,8 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
   const takeApply = live && prize;
   const laterApply = live && !prize;
   const laterQuiet = !prize;
+  const hasApplyUrl = Boolean(listing.applyUrl);
+  const laneName = laneLabel(listing.lane);
 
   return (
     <article
@@ -28,59 +31,98 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
       data-listing-card=""
       data-rank={listing.rank}
       data-listing-id={listing.id}
+      data-card-kind={prize ? "lead" : "ledger"}
       {...(takeApply ? { "data-take-apply": "" } : {})}
       {...(laterApply ? { "data-later-apply": "" } : {})}
       {...(laterQuiet ? { "data-later-quiet": "" } : {})}
     >
-      {prize ? <span className="sheet-pin" aria-hidden="true" /> : null}
       <p className={prize ? "sheet-rankline" : "later-rankline"}>
-        <span className="rank">#{listing.rank}</span>
-        {prize ? null : (
-          <span className="later-role" data-later-role="">
-            {listing.title}
-          </span>
-        )}
-        <span className="remote">Remote (global)</span>
+        <span className="rank" aria-label={`Rank ${listing.rank}`}>
+          #{listing.rank}
+        </span>
       </p>
       <div className="card-body">
-        {prize ? (
-          <h3 className="title" data-prize-title="">
-            {listing.title}
-          </h3>
-        ) : null}
+        <div className="card-heading">
+          {prize ? (
+            <h3 className="title" data-prize-title="">
+              {hasApplyUrl ? (
+                <a
+                  className="role-link"
+                  href={applyClickPath(listing.id)}
+                  aria-label={`Open ${listing.title} application`}
+                  data-card-surface=""
+                >
+                  {listing.title}
+                </a>
+              ) : (
+                listing.title
+              )}
+            </h3>
+          ) : (
+            <h3 className="title later-role" data-later-role="">
+              {hasApplyUrl ? (
+                <a
+                  className="role-link"
+                  href={applyClickPath(listing.id)}
+                  aria-label={`Open ${listing.title} application`}
+                  data-card-surface=""
+                >
+                  {listing.title}
+                </a>
+              ) : (
+                listing.title
+              )}
+            </h3>
+          )}
+          <span className="bid" data-bid="">
+            {formatUsd(listing.bidUsd)}
+          </span>
+        </div>
         <p className="company" data-company="">
           {listing.company}
         </p>
-        {listing.salary ? (
-          <p className="salary" data-salary="">
-            {formatUsd(listing.salary.minUsd)}–{formatUsd(listing.salary.maxUsd)}
-          </p>
-        ) : null}
+        <p className="listing-summary">
+          <span className="remote">Remote (global)</span>
+          <span>{laneName} role</span>
+          {listing.salary ? (
+            <span className="salary" data-salary="">
+              · {formatUsd(listing.salary.minUsd)}–{formatUsd(listing.salary.maxUsd)}
+            </span>
+          ) : null}
+        </p>
+        <p
+          className="meta"
+          {...(listing.rank === 1 ? { "data-later-fact": "" } : {})}
+        >
+          <span className="meta-copy">
+            {laneName} · paid placement
+          </span>
+          <span className="clicks" data-clicks="">
+            {formatClicks(listing.clicks)}
+          </span>
+        </p>
         <p
           className="sheet-apply"
-          {...(takeApply ? { "data-apply-after-identity": "" } : {})}
+          {...(takeApply ? { "data-apply-state": "first" } : {})}
         >
           {prize ? (
-            <a
-              className="apply"
-              href={applyClickPath(listing.id)}
-              data-apply-url={listing.applyUrl}
-              {...(takeApply
-                ? {
-                    "data-apply-live": "",
-                    "data-first-click": "apply",
-                    "data-apply-after-list-first": "",
-                    "data-apply-after-list-two": "",
-                    "data-apply-after-list-three": "",
-                    "data-apply-after-list-four": "",
-                    "data-apply-after-list-five": "",
-                    "data-apply-after-list-six": "",
-                  }
-                : {})}
-            >
-              Apply
-            </a>
-          ) : (
+            hasApplyUrl ? (
+              <a
+                className="apply"
+                href={applyClickPath(listing.id)}
+                data-apply-url={listing.applyUrl}
+                {...(takeApply
+                  ? { "data-apply-live": "", "data-first-click": "apply" }
+                  : {})}
+              >
+                Apply
+              </a>
+            ) : (
+              <span className="apply unavailable" data-apply-unavailable="">
+                Apply unavailable
+              </span>
+            )
+          ) : hasApplyUrl ? (
             <a
               className="later-apply"
               href={applyClickPath(listing.id)}
@@ -91,38 +133,35 @@ export function ListingCard({ listing, live = true }: ListingCardProps) {
             >
               Apply
             </a>
+          ) : (
+            <span className="later-apply unavailable" data-apply-unavailable="">
+              Apply unavailable
+            </span>
           )}
         </p>
+        {takeApply ? (
+          <a
+            className="hover-claim"
+            href="#claim"
+            data-hover-claim=""
+            aria-label={`Claim this rank for ${formatUsd(listing.bidUsd + 1)}`}
+          >
+            Claim this rank for {formatUsd(listing.bidUsd + 1)}
+          </a>
+        ) : null}
         {takeApply ? (
           <p className="list-after-apply-wrap">
             <a
               className="list-after-apply"
               href="#claim"
               data-list-after-apply=""
-              data-list-after-apply-first=""
-              data-list-after-apply-two=""
-              data-list-after-apply-three=""
-              data-list-after-apply-four=""
-              data-list-after-apply-five=""
-              data-list-after-apply-six=""
-              data-list-after-apply-seven=""
+              data-list-action="role"
             >
               List a role
             </a>{" "}
             after Apply. Paying less than #1 still lists.
           </p>
         ) : null}
-        <p
-          className="meta"
-          {...(listing.rank === 1 ? { "data-later-fact": "" } : {})}
-        >
-          <span className="bid" data-bid="">
-            {formatUsd(listing.bidUsd)}
-          </span>
-          <span className="clicks" data-clicks="">
-            {formatClicks(listing.clicks)}
-          </span>
-        </p>
       </div>
     </article>
   );

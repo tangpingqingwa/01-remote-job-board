@@ -1,4 +1,4 @@
-/** SPEC §6 — clean apply URLs before store or outbound redirect. No network. */
+/** SPEC §6 — clean apply URLs before store or outbound redirect. */
 
 export type UrlErrorCode =
   | "invalid_url"
@@ -267,17 +267,68 @@ export function outboundApplyUrl(stored: string): string {
 
 export type UrlResolveEnv = Record<string, string | undefined>;
 
+export const SHORTENER_HOP_TIMEOUT_MS = 5_000;
+
 export function isLiveUrlResolveEnabled(
   env: UrlResolveEnv = process.env,
 ): boolean {
-  if (env.POLAR_FIXTURE_ONLY === "1") return false;
-  return env.URL_RESOLVE_LIVE === "1" || env.POLAR_LIVE === "1";
+  if (env.WAFFO_MODE === "fixture") return false;
+  return env.URL_RESOLVE_LIVE === "1"
+    || env.WAFFO_MODE === "waffo-test"
+    || env.WAFFO_MODE === "waffo-prod";
 }
 
-type FetchLike = (
+export type ShortenerFetch = (
   input: string,
-  init: { method: string; redirect: "manual" },
+  init: {
+    method: "HEAD";
+    redirect: "manual";
+    signal?: AbortSignal;
+  },
 ) => Promise<{ headers: { get(name: string): string | null } }>;
+
+export type ShortenerResolveDeps = {
+  fetchImpl?: ShortenerFetch;
+  env?: UrlResolveEnv;
+  /** Tests may shorten the production timeout without changing live defaults. */
+  timeoutMs?: number;
+};
+
+function defaultShortenerFetch(): ShortenerFetch {
+  const globalFetch = globalThis.fetch;
+  if (typeof globalFetch !== "function") unresolvedShortener();
+  return (input, init) => globalFetch.call(globalThis, input, init);
+}
+
+function looksLikeAbsoluteUrl(raw: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(raw);
+}
+
+/**
+ * Resolve only a documented shortener input. Handles and direct HTTPS URLs
+ * are returned untouched so checkout creation stays offline for them.
+ */
+export async function resolveShortenerInput(
+  raw: string,
+  deps: ShortenerResolveDeps = {},
+): Promise<string> {
+  const trimmed = raw.trim();
+  if (!looksLikeAbsoluteUrl(trimmed)) return trimmed;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return trimmed;
+  }
+  if (
+    parsed.protocol.toLowerCase() !== "https:" ||
+    !isShortenerHost(hostnameOf(parsed))
+  ) {
+    return trimmed;
+  }
+  return resolveShortenerHop(trimmed, deps);
+}
 
 /**
  * Live-only: one redirect hop for a documented shortener. Tests must not call
@@ -285,36 +336,49 @@ type FetchLike = (
  */
 export async function resolveShortenerHop(
   raw: string,
-  deps: { fetchImpl?: FetchLike; env?: UrlResolveEnv } = {},
+  deps: ShortenerResolveDeps = {},
 ): Promise<string> {
   const env = deps.env ?? process.env;
-  if (!isLiveUrlResolveEnabled(env)) unresolvedShortener();
-
   const parsed = parseAbsoluteUrl(raw);
   const host = hostnameOf(parsed);
   if (!isShortenerHost(host)) {
     return raw.trim();
   }
 
-  const fetchImpl = deps.fetchImpl;
-  if (!fetchImpl) unresolvedShortener();
+  if (!isLiveUrlResolveEnabled(env)) unresolvedShortener();
+
+  const fetchImpl = deps.fetchImpl ?? defaultShortenerFetch();
 
   let location: string | null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const controller =
+    typeof AbortController === "function" ? new AbortController() : undefined;
   try {
-    const response = await fetchImpl(parsed.href, {
+    const responsePromise = fetchImpl(parsed.href, {
       method: "HEAD",
       redirect: "manual",
+      ...(controller ? { signal: controller.signal } : {}),
     });
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller?.abort();
+        reject(new Error("shortener hop timed out"));
+      }, deps.timeoutMs ?? SHORTENER_HOP_TIMEOUT_MS);
+    });
+    const response = await Promise.race([responsePromise, timeout]);
     location = response.headers.get("location");
   } catch {
     unresolvedShortener();
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 
-  if (!location) unresolvedShortener();
+  const trimmedLocation = location?.trim();
+  if (!trimmedLocation) unresolvedShortener();
 
   let resolved: URL;
   try {
-    resolved = new URL(location, parsed);
+    resolved = new URL(trimmedLocation, parsed);
   } catch {
     unresolvedShortener();
   }

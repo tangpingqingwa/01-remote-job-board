@@ -3,7 +3,7 @@
 **Contract:** [SPEC.md](./SPEC.md)  
 **Git:** [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-Pay-to-rank remote jobs. Clone [outbid.lol](https://outbid.lol/) mechanics into a weekly function-lane board. Rank is the bid. Polar is MoR in live; fixture checkout in tests.
+Pay-to-rank remote jobs. Clone [outbid.lol](https://outbid.lol/) mechanics into a function-lane board with live rank rolling for the last 7 days from paid placement. ISO weekId is audit-only; Monday 00:00 UTC does not drop live rank. Waffo Pancake is the sole live Merchant of Record; fixture checkout is explicit in tests and CI.
 
 This document locks the stack and the PR sequence. Do not implement the app in the docs PR that lands this file.
 
@@ -18,9 +18,9 @@ This document locks the stack and the PR sequence. Do not implement the app in t
 | DB | **SQLite** via `better-sqlite3` (one file). Tests use a temp file. No Postgres in v1 — keep CI offline and one-box |
 | Rank | Pure function `rankListings(listings): RankedListing[]` — `bidUsd` desc, then `createdAt` asc |
 | Period | Live rank = rolling last 7 days from paid placement. `periodId` is an ISO-week audit label (`YYYY-Www`). Inject `now` in tests |
-| Payments | `PolarPort.createCheckout({ amountUsd, listingDraft, successUrl })`. **Live Polar** when `POLAR_LIVE=1`. **`FakePolarPort`** fixture otherwise. `POLAR_FIXTURE_ONLY=1` always wins |
+| Payments | `PolarPort.createCheckout({ amountUsd, listingDraft, successUrl })` compatibility interface. Explicit `WAFFO_MODE=fixture`, `waffo-test`, or `waffo-prod` selects the fixture or official Waffo Pancake path; retired Polar flags never select a provider |
 | Clicks | `GET /out/[id]` increments then 302 to canonical apply URL |
-| Tests | `node:test` + fixture Polar. No network |
+| Tests | `node:test` + explicit Waffo fixture. No network |
 | CI | `.github/workflows/ci.yml` job **`ci`** → `bash scripts/test.sh` |
 
 Do not add Stripe, ads, API keys, or a public JSON API in this launch path.
@@ -61,8 +61,9 @@ Do not add Stripe, ads, API keys, or a public JSON API in this launch path.
 │   │   ├── listing.ts
 │   │   └── types.ts
 │   ├── payments/
-│   │   ├── polar.ts           # live, env-gated
-│   │   ├── fixture.ts
+│   │   ├── waffo.ts           # official SDK, signed webhook, env-gated
+│   │   ├── fixture.ts         # explicit offline fixture
+│   │   ├── polar.ts           # retired inert compatibility module
 │   │   └── port.ts
 │   └── migrations/
 │       └── 001_init.sql
@@ -81,7 +82,7 @@ Until PR 1, only the contract files and `scripts/test.sh` exist.
 
 ## 3. Tests (extend `scripts/test.sh`)
 
-`scripts/test.sh` stays **offline**. After the app exists it runs `tsc` and `node:test`. It must never set `POLAR_LIVE=1` or call `live-smoke.sh`.
+`scripts/test.sh` stays **offline**. After the app exists it runs `tsc`, `node:test`, and the release `next build` gate. It must never select `waffo-test`/`waffo-prod`, call a provider, or call `live-smoke.sh`.
 
 | Area | Assert |
 |---|---|
@@ -89,8 +90,8 @@ Until PR 1, only the contract files and `scripts/test.sh` exist.
 | raise | owner pays difference; stranger cannot pay only the difference |
 | urls | query stripped; chat/NSFW rejected; https required |
 | salary | omitted → null; never filled in |
-| period | Monday 00:00 UTC starts a new audit `periodId`; live query is rolling last 7 days from paid placement, not that midnight |
-| polar | fixture checkout completes without network; live module unused unless flag |
+| period | Monday 00:00 UTC starts a new audit `periodId`; live query is rolling last 7 days from paid placement, not that midnight. Monday does not drop live rank. |
+| payments | explicit fixture checkout completes without network; Waffo live module is covered with injected fetch/signature vectors only |
 | clicks | `/out/:id` increments and redirects without adding query params |
 
 ---
@@ -103,7 +104,7 @@ Each heading below is exactly `### PR N: title` on its own line so the fleet par
 - **Description:** Next.js + TS skeleton, SQLite schema stub, health/home placeholder, lockfile. Extend `scripts/test.sh` to install + typecheck when `package.json` exists. Keep tests offline.
 - **Files:** `package.json`, `tsconfig.json`, `next.config.ts`, `src/app/layout.tsx`, `src/app/page.tsx`, `src/lib/types.ts`, `src/migrations/001_init.sql`, `.env.example`, `scripts/test.sh`
 - **Dependencies:** None (docs already on `main`)
-- **Acceptance:** `bash scripts/test.sh` green with no Polar secrets. Job `ci` still the only required check. No live Polar. No real board logic required beyond a compiling app.
+- **Acceptance:** `bash scripts/test.sh` green with no Waffo secrets or provider calls. Job `ci` still the only required check. No live Waffo. No real board logic required beyond a compiling app.
 
 ### PR 2: Board UI clone of outbid.lol
 - **Description:** Public board: lane tabs, one input (apply URL or company handle), amount, **Outbid** button, ranked cards showing **$** bid and **clicks**. Fixture listings are enough; checkout may still be a stub that does not charge.
@@ -111,11 +112,11 @@ Each heading below is exactly `### PR N: title` on its own line so the fleet par
 - **Dependencies:** PR 1
 - **Acceptance:** Empty lane is honest (no invented jobs). Cards render rank, title, company, `$N`, click count. Sort matches SPEC §3 on fixture rows.
 
-### PR 3: Polar checkout + fixture
-- **Description:** Outbid starts a checkout for the bid amount. Live Polar is env-gated. Tests complete payment through `FakePolarPort`. `/return` shows success or cancel. Rank updates only after paid.
-- **Files:** `src/payments/port.ts`, `src/payments/fixture.ts`, `src/payments/polar.ts`, `src/app/return/page.tsx`, `tests/checkout.test.ts`
+### PR 3: Waffo checkout + fixture
+- **Description:** Outbid starts a checkout for the bid amount. Explicit Waffo test/prod modes use the official Pancake SDK; tests complete payment through the explicit fixture port and signed webhook vectors. `/return` shows success or cancel. Rank updates only after paid.
+- **Files:** `src/payments/port.ts`, `src/payments/fixture.ts`, `src/payments/waffo.ts`, `src/payments/polar.ts`, `src/app/return/page.tsx`, `tests/checkout.test.ts`, `tests/payment-lifecycle.test.ts`
 - **Dependencies:** PR 2
-- **Acceptance:** Fixture: $5 new listing appears after fake pay. Abandoned checkout does not list. `POLAR_FIXTURE_ONLY=1` wins. CI does not call Polar.
+- **Acceptance:** Fixture: $5 new listing appears after fake pay. Abandoned checkout does not list. `WAFFO_MODE=fixture` is explicit, production cannot self-settle through fixture, and CI does not call Waffo.
 
 ### PR 4: Raise-bid
 - **Description:** Same apply URL or company handle in the same lane + period raises the existing listing. Owner pays `newBid − currentBid`. A different payer cannot take the rank by paying only that difference.
@@ -124,7 +125,7 @@ Each heading below is exactly `### PR N: title` on its own line so the fleet par
 - **Acceptance:** SPEC raise examples. `raise_too_small`, `raise_not_owner`, `identity_taken` as specified.
 
 ### PR 5: Rules and about pages
-- **Description:** `/about` and `/rules` in English. State: no ads, no API keys, no revenue share; rank is the bid; min $5 / max $50,000; weekly UTC reset; no invented salaries; global remote.
+- **Description:** `/about` and `/rules` in English. State: no ads, no API keys, no revenue share; rank is the bid; min $5 / max $50,000; rolling last 7 days from paid placement; ISO weekId is audit-only; Monday 00:00 UTC does not drop live rank; no invented salaries; global remote.
 - **Files:** `src/app/about/page.tsx`, `src/app/rules/page.tsx`
 - **Dependencies:** PR 1
 - **Acceptance:** Pages 200. Rules text matches SPEC §3–§6. Board nav links to both.
@@ -135,17 +136,17 @@ Each heading below is exactly `### PR N: title` on its own line so the fleet par
 - **Dependencies:** PR 2
 - **Acceptance:** SPEC §6 and error codes. Stored and outbound links have no tracking query.
 
-### PR 7: Weekly reset + public apply clicks
-- **Description:** Period helper (ISO weekId at Monday 00:00 UTC as an audit label). Live rank is the rolling last 7 days from paid placement. Click route increments public count and 302s to the canonical apply URL. Board reads the rolling window unless `?period=` is a closed weekId.
+### PR 7: ISO audit week + rolling rank + public apply clicks
+- **Description:** Period helper (ISO weekId at Monday 00:00 UTC as an audit label). Live rank is the rolling last 7 days from paid placement; Monday does not drop live rank. Click route increments public count and 302s to the canonical apply URL. Board reads the rolling window unless `?period=` is a closed weekId.
 - **Files:** `src/lib/period.ts`, `src/app/out/[id]/route.ts`, `tests/period.test.ts`
 - **Dependencies:** PR 2
-- **Acceptance:** Injected clock rolls the week; live query drops old bids. Click count is public on the card.
+- **Acceptance:** Injected clock crosses Monday and ages paid rows at seven days; live query drops only expired bids. Click count is public on the card.
 
-### PR 8: Live-smoke
-- **Description:** Operator script walks SPEC §10 against a local Next.js server with `POLAR_LIVE=1`. Missing Polar secrets → `BLOCKED-SECRET`. Not invoked from `scripts/test.sh` or Actions.
+### PR 8: Waffo offline-smoke
+- **Description:** Operator script walks SPEC §10 against a local fixture-mode Next.js-handler server with `WAFFO_MODE=fixture`. It never invokes a provider. An authorized deployment runbook may separately exercise Waffo test/prod with complete configuration; missing values are `BLOCKED-SECRET` / `BLOCKED-CONFIG`. Not invoked from `scripts/test.sh` or Actions.
 - **Files:** `scripts/live-smoke.sh`, `docs/live-smoke.md`
 - **Dependencies:** PR 3, PR 4, PR 5, PR 6, PR 7
-- **Acceptance:** Script is executable. CI must not set `POLAR_LIVE` or call the script. Offline `scripts/test.sh` still green.
+- **Acceptance:** Script is executable, fixture-only, and reports no provider calls. CI must not select a live Waffo mode or call the script. Offline `scripts/test.sh` still green.
 
 ---
 
@@ -155,8 +156,8 @@ Launch-path complete is **not** fleet-done. After PR 8 is on `main`, an operator
 
 | Unit | Required |
 |---|---|
-| Offline `scripts/test.sh` | green on `origin/main`; never sets live Polar |
-| Live Polar checkout | real Checkout or `BLOCKED-SECRET` + env var name |
+| Offline `scripts/test.sh` | green on `origin/main`; never selects live Waffo |
+| Waffo checkout | authorized test/prod Checkout or `BLOCKED-SECRET` / `BLOCKED-CONFIG` + env var name |
 | Raise difference | live or fixture-on-live-process as documented in the smoke doc |
 | URL + NSFW + chat rejects | `PASS-ERROR` with SPEC codes |
 | Rolling 7-day window | clock-injected; occupancy gone 7 days after paid placement; Monday 00:00 UTC alone does not drop it |

@@ -3,24 +3,27 @@ import { afterEach, test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getBoardListings } from "../src/lib/board";
 import { currentPeriodMeta } from "../src/lib/period";
-import { draftFromOutbidInput, planCheckout } from "../src/lib/listing";
+import {
+  draftFromOutbidInput,
+  parseSalaryBand,
+  planCheckout,
+  resolveListingIdentity,
+} from "../src/lib/listing";
 import { BoardStore, defaultBoardStore } from "../src/lib/store";
 import { rankListings } from "../src/lib/rank";
-import {
-  DEFAULT_POLAR_API_BASE,
-  isPolarLive,
-  polarApiBase,
-} from "../src/payments/env";
+import { getPaymentMode, isPolarLive } from "../src/payments/env";
 import { FakePolarPort, resetFixtureIds } from "../src/payments/fixture";
-import { LivePolarPort } from "../src/payments/polar";
 import {
   CheckoutError,
   getPolarPort,
   handleCheckoutReturn,
   parseBidUsd,
 } from "../src/payments/port";
+import { LiveWaffoPort } from "../src/payments/waffo";
 
 const PERIOD = "2026-W34";
+
+if (!process.env.WAFFO_MODE) process.env.WAFFO_MODE = "fixture";
 
 afterEach(() => {
   resetFixtureIds();
@@ -173,129 +176,81 @@ test("shared fixture port keeps checkout across getPolarPort calls", async () =>
   resetFixtureIds();
 });
 
-test("POLAR_FIXTURE_ONLY=1 wins over POLAR_LIVE=1", () => {
-  assert.equal(
-    isPolarLive({ POLAR_LIVE: "1", POLAR_FIXTURE_ONLY: "1" }),
-    false,
-  );
-  assert.equal(isPolarLive({ POLAR_LIVE: "1" }), true);
-  assert.equal(isPolarLive({ POLAR_FIXTURE_ONLY: "1" }), false);
-  assert.equal(isPolarLive({}), false);
-
-  const previousLive = process.env.POLAR_LIVE;
-  const previousFixture = process.env.POLAR_FIXTURE_ONLY;
-  process.env.POLAR_LIVE = "1";
-  process.env.POLAR_FIXTURE_ONLY = "1";
-  try {
-    assert.equal(getPolarPort() instanceof FakePolarPort, true);
-    assert.throws(() => new LivePolarPort(), /env-gated|BLOCKED-SECRET/);
-  } finally {
-    if (previousLive === undefined) delete process.env.POLAR_LIVE;
-    else process.env.POLAR_LIVE = previousLive;
-    if (previousFixture === undefined) delete process.env.POLAR_FIXTURE_ONLY;
-    else process.env.POLAR_FIXTURE_ONLY = previousFixture;
-  }
+test("retired Polar flags can never select a provider", () => {
+  assert.equal(isPolarLive({ POLAR_LIVE: "1" }), false);
+  assert.throws(() => getPaymentMode({}), /BLOCKED-CONFIG: WAFFO_MODE/);
 });
 
-test("live Polar module is unused unless POLAR_LIVE=1", () => {
-  const previousLive = process.env.POLAR_LIVE;
-  const previousFixture = process.env.POLAR_FIXTURE_ONLY;
-  delete process.env.POLAR_LIVE;
-  process.env.POLAR_FIXTURE_ONLY = "1";
-  try {
-    assert.equal(isPolarLive(), false);
-    assert.throws(() => new LivePolarPort(), /env-gated/);
-    const source = require("node:fs").readFileSync(
-      require("node:path").join(__dirname, "../src/payments/polar.ts"),
-      "utf8",
-    ) as string;
-    assert.match(source, /unused in tests and CI/);
-    assert.match(source, /polarApiBase/);
-    assert.equal(polarApiBase({}), DEFAULT_POLAR_API_BASE);
-    assert.equal(
-      polarApiBase({ POLAR_API_BASE: "https://sandbox-api.polar.sh/" }),
-      "https://sandbox-api.polar.sh",
-    );
-  } finally {
-    if (previousLive === undefined) delete process.env.POLAR_LIVE;
-    else process.env.POLAR_LIVE = previousLive;
-    if (previousFixture === undefined) delete process.env.POLAR_FIXTURE_ONLY;
-    else process.env.POLAR_FIXTURE_ONLY = previousFixture;
-  }
+test("retired Polar module is inert", () => {
+  assert.equal(isPolarLive({ POLAR_LIVE: "1" }), false);
 });
 
-test("live Polar createCheckout posts to POLAR_API_BASE and does not list unpaid", async () => {
-  const previousLive = process.env.POLAR_LIVE;
-  const previousFixture = process.env.POLAR_FIXTURE_ONLY;
-  process.env.POLAR_LIVE = "1";
-  delete process.env.POLAR_FIXTURE_ONLY;
-  const store = new BoardStore();
-  const calls: { url: string; body: unknown }[] = [];
-  const polar = new LivePolarPort({
-    env: {
-      POLAR_LIVE: "1",
-      POLAR_ACCESS_TOKEN: "polar_oat_test",
-      POLAR_PRODUCT_ID: "prod_test",
-      POLAR_API_BASE: "https://sandbox-api.polar.sh",
-    },
-    store,
-    fetch: async (input, init) => {
-      const url = String(input);
-      const method = String(init?.method ?? "GET").toUpperCase();
-      const body = init?.body ? JSON.parse(String(init.body)) : null;
-      calls.push({ url, body });
-      if (method === "POST") {
-        assert.equal(url, "https://sandbox-api.polar.sh/v1/checkouts/");
-        return new Response(
-          JSON.stringify({
-            id: "chk_live_sandbox",
-            url: "https://sandbox.polar.sh/checkout/chk_live_sandbox",
-            status: "open",
-          }),
-          { status: 201, headers: { "content-type": "application/json" } },
-        );
-      }
-      return new Response(JSON.stringify({ id: "chk_live_sandbox", status: "open" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
+test("Waffo mode is the sole provider selector", () => {
+  const inheritedPolar = {
+    POLAR_LIVE: "1",
+    POLAR_ACCESS_TOKEN: "legacy-access-token",
+    POLAR_WEBHOOK_SECRET: "legacy-webhook-secret",
+    POLAR_PRODUCT_ID: "legacy-product",
+    POLAR_API_BASE: "https://legacy.polar.invalid",
+    POLAR_SUCCESS_URL: "https://legacy.example/return",
+    POLAR_FIXTURE_ONLY: "1",
+  };
+  assert.equal(getPaymentMode({ WAFFO_MODE: "fixture", ...inheritedPolar }), "fixture");
+  assert.equal(isPolarLive(inheritedPolar), false);
+});
+
+test("Waffo checkout requires explicit validated production configuration", async () => {
+  assert.throws(() => getPaymentMode({ WAFFO_LIVE: "1" }), /BLOCKED-CONFIG: WAFFO_MODE/);
+  assert.throws(() => new LiveWaffoPort({ env: { WAFFO_MODE: "waffo-prod" }, fetch: async () => new Response() }), /BLOCKED-CONFIG/);
+});
+
+test("checkout preparation resolves one live shortener hop before storing identity", async () => {
+  let calls = 0;
+  const identity = await resolveListingIdentity("https://bit.ly/acme-backend", {
+    env: { WAFFO_MODE: "waffo-test" },
+    fetchImpl: async (_input, init) => {
+      calls += 1;
+      assert.equal(init.method, "HEAD");
+      assert.equal(init.redirect, "manual");
+      return {
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === "location"
+              ? "https://jobs.example.com/acme?utm_source=checkout"
+              : null,
+        },
+      };
     },
   });
-  try {
-    const started = await polar.createCheckout({
-      amountUsd: 5,
-      listingDraft: draft(),
-      successUrl: "http://127.0.0.1:3000/return",
-    });
-    assert.equal(started.checkoutId, "chk_live_sandbox");
-    assert.equal(
-      started.url,
-      "https://sandbox.polar.sh/checkout/chk_live_sandbox",
-    );
-    assert.equal(calls.length, 1);
-    assert.deepEqual((calls[0]?.body as { products: string[] }).products, [
-      "prod_test",
-    ]);
-    assert.equal((calls[0]?.body as { amount: number }).amount, 500);
-    assert.equal(store.listPaid("backend", PERIOD).length, 0);
-    assert.equal(await polar.completeCheckout(started.checkoutId), null);
-  } finally {
-    if (previousLive === undefined) delete process.env.POLAR_LIVE;
-    else process.env.POLAR_LIVE = previousLive;
-    if (previousFixture === undefined) delete process.env.POLAR_FIXTURE_ONLY;
-    else process.env.POLAR_FIXTURE_ONLY = previousFixture;
-  }
+  assert.equal(identity, "https://jobs.example.com/acme");
+  assert.equal(calls, 1);
+
+  const draftFromResolved = draftFromOutbidInput({
+    identity,
+    amountUsd: 5,
+    lane: "backend",
+    periodId: PERIOD,
+    company: "Acme",
+  });
+  const plan = planCheckout(new BoardStore(), draftFromResolved);
+  assert.equal(plan.kind, "create");
+  assert.equal(plan.draft.applyUrl, "https://jobs.example.com/acme");
 });
 
-test("/return markup shows success or cancel", async () => {
+test("Polar checkout path is retired", async () => {
+  assert.equal(isPolarLive({ POLAR_LIVE: "1" }), false);
+});
+
+test("/return markup shows pending or cancel without claiming payment", async () => {
   const { default: ReturnPage } = await import("../src/app/return/page");
   const successHtml = renderToStaticMarkup(
     await ReturnPage({
       searchParams: Promise.resolve({ checkoutId: "missing" }),
     }),
   );
-  assert.match(successHtml, /data-return="success"/);
-  assert.match(successHtml, /on the board/i);
+  assert.match(successHtml, /data-return="pending"/);
+  assert.match(successHtml, /Payment pending/i);
+  assert.doesNotMatch(successHtml, /Payment completed/i);
   assert.match(successHtml, /Back to the board/);
 
   const cancelHtml = renderToStaticMarkup(
@@ -309,6 +264,54 @@ test("/return markup shows success or cancel", async () => {
   assert.match(cancelHtml, /data-return="cancel"/);
   assert.match(cancelHtml, /No rank claimed/);
   assert.match(cancelHtml, /does not list/);
+});
+
+test("/checkout/complete is intent-keyed, read-only, and truthful across refresh", async () => {
+  const { default: CheckoutCompletePage } = await import("../src/app/checkout/complete/page");
+  const polar = getPolarPort();
+  const started = await polar.createCheckout({
+    amountUsd: 5,
+    listingDraft: draft({ company: "Pending", companyHandle: "pending", applyUrl: "https://jobs.example.com/pending" }),
+    successUrl: "http://localhost:3000/return",
+  });
+  assert.ok(started.intentId);
+
+  const pendingHtml = renderToStaticMarkup(await CheckoutCompletePage({
+    searchParams: Promise.resolve({ intent: started.intentId }),
+  }));
+  assert.match(pendingHtml, /data-complete-state="pending"/);
+  assert.match(pendingHtml, /Payment pending/);
+  assert.doesNotMatch(pendingHtml, /Payment received/);
+  assert.equal(polar.getCheckout(started.checkoutId)?.status, "open");
+
+  const listing = await polar.completeCheckout(started.checkoutId);
+  assert.ok(listing);
+  const paidHtml = renderToStaticMarkup(await CheckoutCompletePage({
+    searchParams: Promise.resolve({ intent: started.intentId }),
+  }));
+  assert.match(paidHtml, /data-complete-state="paid"/);
+  assert.match(paidHtml, /Payment received/);
+  assert.match(paidHtml, /Pending is listed at \$5/);
+
+  const unknownHtml = renderToStaticMarkup(await CheckoutCompletePage({
+    searchParams: Promise.resolve({ intent: "intent_missing" }),
+  }));
+  assert.match(unknownHtml, /data-complete-state="unknown"/);
+  assert.match(unknownHtml, /could not confirm/i);
+  assert.doesNotMatch(unknownHtml, /Payment received/);
+
+  const abandoned = await polar.createCheckout({
+    amountUsd: 5,
+    listingDraft: draft({ company: "Abandoned", companyHandle: "abandoned", applyUrl: "https://jobs.example.com/abandoned" }),
+    successUrl: "http://localhost:3000/return",
+  });
+  assert.ok(abandoned.intentId);
+  await polar.abandonCheckout(abandoned.checkoutId);
+  const failedHtml = renderToStaticMarkup(await CheckoutCompletePage({
+    searchParams: Promise.resolve({ intent: abandoned.intentId }),
+  }));
+  assert.match(failedHtml, /data-complete-state="failed"/);
+  assert.match(failedHtml, /No rank claimed/);
 });
 
 test("parseBidUsd enforces whole dollars and SPEC min/max", () => {
@@ -328,6 +331,20 @@ test("parseBidUsd enforces whole dollars and SPEC min/max", () => {
     assert.equal(err.code, "bid_above_max");
     return true;
   });
+});
+
+test("optional salary requires both annual USD bounds and preserves null", () => {
+  assert.equal(parseSalaryBand("", ""), null);
+  assert.deepEqual(parseSalaryBand("120000", "160000"), {
+    minUsd: 120_000,
+    maxUsd: 160_000,
+  });
+  for (const [min, max] of [["120000", ""], ["160000", "120000"], ["$120000", "160000"]]) {
+    assert.throws(
+      () => parseSalaryBand(min, max),
+      (error: unknown) => error instanceof CheckoutError && error.code === "salary_invalid",
+    );
+  }
 });
 
 test("default board store stays empty without a paid checkout", () => {
@@ -708,6 +725,8 @@ test("checkout route charges the raise difference for the owner", async () => {
     lane: "backend",
     identity: "https://jobs.example.com/acme",
     amount: "8",
+    title: "Staff Backend Engineer",
+    company: "Acme",
     payerId: "pay_aaaaaaaaaaaaaaaa",
   });
   const response = await POST(
@@ -735,6 +754,51 @@ test("checkout route charges the raise difference for the owner", async () => {
   resetFixtureIds();
 });
 
+test("checkout POST rejects an unknown lane instead of charging backend", async () => {
+  defaultBoardStore.reset();
+  resetFixtureIds();
+  const { POST } = await import("../src/app/checkout/route");
+  const body = new URLSearchParams({
+    lane: "not-a-lane",
+    identity: "https://jobs.example.com/invalid-lane",
+    amount: "5",
+  });
+  const response = await POST(
+    new Request("http://localhost:3000/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body,
+    }),
+  );
+  assert.equal(response.status, 303);
+  const location = new URL(response.headers.get("location") ?? "");
+  assert.equal(location.searchParams.get("error"), "invalid_lane");
+  assert.equal(location.searchParams.get("lane"), "backend");
+  assert.deepEqual(getBoardListings("backend", currentPeriodMeta().periodId), []);
+});
+
+test("checkout POST rejects a role without title or company fields", async () => {
+  defaultBoardStore.reset();
+  resetFixtureIds();
+  const { POST } = await import("../src/app/checkout/route");
+  const body = new URLSearchParams({
+    lane: "backend",
+    identity: "https://jobs.example.com/missing-role-fields",
+    amount: "5",
+  });
+  const response = await POST(
+    new Request("http://localhost:3000/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body,
+    }),
+  );
+  const location = new URL(response.headers.get("location") ?? "");
+  assert.equal(response.status, 303);
+  assert.equal(location.searchParams.get("error"), "invalid_listing");
+  assert.deepEqual(getBoardListings("backend", currentPeriodMeta().periodId), []);
+});
+
 test("checkout route rejects a stranger raise with identity_taken", async () => {
   defaultBoardStore.reset();
   resetFixtureIds();
@@ -759,6 +823,8 @@ test("checkout route rejects a stranger raise with identity_taken", async () => 
     lane: "backend",
     identity: "https://jobs.example.com/acme",
     amount: "15",
+    title: "Staff Backend Engineer",
+    company: "Acme",
     payerId: "pay_bbbbbbbbbbbbbbbb",
   });
   const response = await POST(

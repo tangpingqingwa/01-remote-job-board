@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Offline gate for main. Must exit 0 on a clean clone with no secrets.
-# Contract checks stay; when the app exists, extend this script with tsc +
-# node:test. Do not replace it with a no-op. Do not require Polar or any
-# live third-party network. Operator live smoke is scripts/live-smoke.sh
-# and is never invoked from here.
+# Offline release gate for main. This script deliberately exercises the real
+# typecheck, test, and build paths without requiring Waffo or any live network.
+# Operator coverage belongs to scripts/live-smoke.sh and is never invoked here.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,1112 +17,435 @@ for f in README.md SPEC.md BUILD.md CONTRIBUTING.md scripts/test.sh; do
   [[ -f "$f" ]] || fail "missing $f"
   [[ -s "$f" ]] || fail "empty $f"
 done
-
-echo "== contributing rules are documented =="
 grep -q 'main must always be buildable' CONTRIBUTING.md \
   || grep -q 'main` must always be buildable' CONTRIBUTING.md \
   || fail "CONTRIBUTING.md does not state the main-branch rule"
-
-echo "== SPEC mentions git collaboration =="
 grep -q 'Git collaboration' SPEC.md || fail "SPEC.md missing Git collaboration section"
-
-echo "== BUILD PR headings are parseable =="
 grep -E '^### PR [0-9]+: ' BUILD.md >/dev/null \
   || fail "BUILD.md missing ### PR N: title headings"
 
-echo "== CI stays offline =="
-if [[ -f .github/workflows/ci.yml ]]; then
-  if grep -nE 'live-smoke|POLAR_LIVE=1' .github/workflows/ci.yml >/dev/null; then
-    fail "CI must not run live-smoke or set POLAR_LIVE=1"
-  fi
+echo "== CI and secret hygiene =="
+if [[ -f .github/workflows/ci.yml ]] && \
+  grep -nE 'live-smoke|WAFFO_MODE=waffo-(test|prod)' .github/workflows/ci.yml >/dev/null; then
+  fail "CI must not run live-smoke or select a live Waffo mode"
 fi
-if grep -Eq '^\s*(bash )?scripts/live-smoke\.sh' scripts/test.sh; then
+if grep -Eq '^\s*(bash )?(\./)?scripts/live-smoke\.sh' scripts/test.sh; then
   fail "test.sh must not invoke live-smoke.sh"
 fi
-
-echo "== no committed secrets =="
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  if git ls-files | grep -E '(^|/)\.env$|(^|/)id_rsa$|\.pem$|credentials\.json$' >/dev/null; then
-    fail "secret-like path is tracked"
-  fi
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && \
+  git ls-files | grep -E '(^|/)\.env$|(^|/)id_rsa$|\.pem$|credentials\.json$' >/dev/null; then
+  fail "secret-like path is tracked"
 fi
-
-echo "== markdown is UTF-8 text =="
-file -b --mime-encoding README.md SPEC.md CONTRIBUTING.md BUILD.md | grep -qiE 'utf-8|us-ascii' \
-  || fail "docs are not UTF-8/ASCII"
+file -b --mime-encoding README.md SPEC.md CONTRIBUTING.md BUILD.md | \
+  grep -qiE 'utf-8|us-ascii' || fail "docs are not UTF-8/ASCII"
 
 if [[ -f package.json ]]; then
-  echo "== skeleton files =="
-  for f in package.json tsconfig.json next.config.ts \
-    src/app/layout.tsx src/app/page.tsx src/lib/types.ts \
-    src/migrations/001_init.sql .env.example; do
+  echo "== skeleton and test surface =="
+  for f in package.json package-lock.json tsconfig.json next.config.ts \
+    src/app/layout.tsx src/app/page.tsx src/app/healthz/route.ts src/lib/types.ts \
+    src/lib/rank.ts src/lib/board.ts src/lib/period.ts \
+    src/lib/urls.ts src/lib/store.ts src/lib/db.ts \
+    src/components/board/board.tsx src/components/board/lane-tabs.tsx \
+    src/components/board/bid-form.tsx src/components/board/listing-card.tsx \
+    src/components/board/leaderboard.tsx tests/rank.test.ts tests/period.test.ts \
+    tests/pages.test.ts tests/checkout.test.ts tests/urls.test.ts tests/live-smoke.test.ts \
+    tests/payment-lifecycle.test.ts src/migrations/001_init.sql .env.example; do
     [[ -f "$f" ]] || fail "missing $f"
     [[ -s "$f" ]] || fail "empty $f"
   done
+  [[ -x scripts/test.sh ]] || fail "scripts/test.sh must remain executable"
+  [[ -x scripts/probe-built-runtime.sh ]] || fail "built runtime probe must remain executable"
 
-  echo "== board UI files =="
-  for f in src/lib/rank.ts src/lib/board.ts \
-    src/components/board/board.tsx \
-    src/components/board/lane-tabs.tsx \
-    src/components/board/bid-form.tsx \
-    src/components/board/listing-card.tsx \
-    src/components/board/leaderboard.tsx \
-    tests/rank.test.ts; do
-    [[ -f "$f" ]] || fail "missing $f"
-    [[ -s "$f" ]] || fail "empty $f"
+  echo "== durable SQLite board store =="
+  for f in src/migrations/*.sql; do
+    [[ -s "$f" ]] || fail "empty migration $f"
   done
+  grep -q 'DATABASE_PATH' src/lib/db.ts || fail "store must use DATABASE_PATH"
+  grep -q 'journal_mode = WAL' src/lib/db.ts || fail "store must enable WAL"
+  grep -q 'UNIQUE (period_id, lane, apply_url)' src/migrations/001_init.sql \
+    || fail "store must enforce URL identity uniqueness"
+  grep -q 'UNIQUE (period_id, lane, company_handle)' src/migrations/001_init.sql \
+    || fail "store must enforce company identity uniqueness"
+  grep -q 'clicks = clicks + 1' src/lib/store.ts \
+    || fail "clicks must increment atomically"
+  grep -q 'SQLite board survives process restart' tests/period.test.ts \
+    || fail "period tests must cover restart persistence"
+  grep -q 'concurrent click increments' tests/period.test.ts \
+    || fail "period tests must cover concurrent click writes"
 
-  echo "== polar checkout files =="
-  for f in src/payments/port.ts src/payments/fixture.ts src/payments/polar.ts \
-    src/app/return/page.tsx src/lib/listing.ts tests/checkout.test.ts; do
+  echo "== Waffo payment lifecycle =="
+  for f in src/payments/env.ts src/payments/port.ts src/payments/fixture.ts \
+    src/payments/waffo.ts src/payments/polar.ts \
+    src/app/api/webhooks/waffo/route.ts src/app/checkout/route.ts \
+    src/app/checkout/complete/page.tsx src/app/return/page.tsx \
+    src/migrations/003_payment_intents.sql src/migrations/004_waffo_payment_lifecycle.sql \
+    src/migrations/005_waffo_identity_reservations.sql; do
     [[ -f "$f" ]] || fail "missing $f"
     [[ -s "$f" ]] || fail "empty $f"
   done
+  grep -q 'payment_intents' src/lib/db.ts || fail "payment intents must be migrated"
+  grep -q 'payment_webhook_deliveries' src/lib/db.ts || fail "deliveries must be durable"
+  grep -q 'waffo_identity_reservations' src/lib/db.ts || fail "provider identities must be reserved"
+  grep -q 'verifyWebhook' src/payments/waffo.ts || fail "webhooks must use SDK verification"
+  grep -q 'order.completed' src/payments/waffo.ts || fail "only order.completed may settle"
+  grep -q 'x-waffo-signature' src/payments/waffo.ts || fail "signature header must be read"
+  grep -q 'WAFFO_MODE' src/payments/env.ts || fail "Waffo mode must be explicit"
+  if grep -n 'NEXT_PHASE' src/payments/env.ts src/payments/fixture.ts >/dev/null; then
+    fail "production guards must not exempt Next build phase"
+  fi
+  grep -q 'FIXTURE_DISABLED_IN_PRODUCTION' src/payments/env.ts \
+    || fail "production fixture mode must fail closed"
+  grep -q 'data.paymentId' src/payments/waffo.ts \
+    || fail "signed events must carry an explicit payment identity"
+  grep -q 'WAFFO_WEBHOOK_TEST_PUBLIC_KEY' src/payments/env.ts \
+    || fail "webhooks must require a mode-scoped key"
+  grep -q 'WAFFO_API_BASE_OFFICIAL' src/payments/env.ts \
+    || fail "production API must be pinned to Waffo"
+  grep -q 'subtotal + (tax ?? 0)' src/payments/waffo.ts \
+    || fail "settlement must reconcile subtotal and tax"
+  grep -q 'amount === subtotal || amount === subtotal + (tax ?? 0)' src/payments/waffo.ts \
+    || fail "settlement must accept only consistent amount variants"
+  grep -q 'status: "retryable"' src/payments/waffo.ts \
+    || fail "atomic failures must remain retryable"
+  grep -q 'result.status === "retryable"' src/app/api/webhooks/waffo/route.ts \
+    || fail "retryable webhook failures must return 5xx"
+  grep -q 'runtimeResourcesFor' src/payments/waffo.ts \
+    || fail "SDK operations must have bounded resources"
   grep -q 'export class FakePolarPort' src/payments/fixture.ts \
-    || fail "fixture.ts must export FakePolarPort"
+    || fail "fixture adapter must remain available offline"
   grep -q 'createCheckout' src/payments/port.ts \
-    || fail "port.ts must define createCheckout"
-  grep -q 'POLAR_FIXTURE_ONLY' src/payments/env.ts \
-    || fail "env.ts must honor POLAR_FIXTURE_ONLY"
-  grep -q 'on the board' src/app/return/page.tsx \
-    || fail "return page must show success copy"
-  grep -q 'No rank claimed' src/app/return/page.tsx \
-    || fail "return page must show cancel copy"
-  if grep -nE 'fetch\(|polar\.sh|api\.polar' src/payments/fixture.ts src/payments/port.ts >/dev/null; then
-    fail "fixture/port must not call Polar over the network"
+    || fail "payment port must define createCheckout"
+  grep -q 'POLAR_PROVIDER_DISABLED' src/payments/polar.ts \
+    || fail "retired Polar adapter must fail closed"
+  if grep -nE 'POLAR_(LIVE|FIXTURE_ONLY)=1' scripts/test.sh scripts/live-smoke.sh .env.example >/dev/null; then
+    fail "offline gates must not select retired Polar"
   fi
-  grep -q 'export function rankListings' src/lib/rank.ts \
-    || fail "rank.ts must export rankListings"
-  grep -q 'Outbid' src/components/board/bid-form.tsx \
-    || fail "bid form must render Outbid"
+  [[ ! -e src/payments/waffo-session.ts ]] \
+    || fail "obsolete hand-written Waffo client must not remain"
+  if grep -nE '^\s*return;\s*$' tests/checkout.test.ts >/dev/null; then
+    fail "checkout tests must not hide legacy assertions"
+  fi
+  if grep -nE 'fetch\(|waffo\.ai|polar\.sh|api\.polar' \
+    src/payments/fixture.ts src/payments/port.ts >/dev/null; then
+    fail "fixture/port must not call a provider over the network"
+  fi
+
+  echo "== direct empty form and occupied wall =="
+  grep -q 'export function rankListings' src/lib/rank.ts || fail "rankListings is missing"
   grep -q 'data-empty-lane' src/components/board/leaderboard.tsx \
-    || fail "leaderboard must have an honest empty-lane state"
+    || fail "empty lane must be explicit"
   grep -q 'Pay \${MIN_BID_USD} to list' src/components/board/leaderboard.tsx \
-    || fail "empty lane must teach pay \$5 to list"
+    || fail "empty lane must teach the minimum bid"
   grep -q 'hideEmptyChrome' src/components/board/leaderboard.tsx \
-    || fail "live empty bay must yield claim chrome"
+    || fail "live empty lane must expose claim chrome"
   grep -q 'data-empty-closed' src/components/board/leaderboard.tsx \
-    || fail "closed empty week must be a distinct empty state"
+    || fail "closed empty lane must be distinct"
   grep -q 'Bids are closed' src/components/board/leaderboard.tsx \
-    || fail "closed empty week must say bids are closed"
+    || fail "closed empty lane must say bids are closed"
   grep -q 'data-live-week' src/components/board/leaderboard.tsx \
-    || fail "closed empty week must point at the live wall"
-  grep -q 'MIN_BID_USD} takes' src/components/board/bid-form.tsx \
-    || fail "empty claim box must say \$5 takes #1"
-  grep -q 'Claim #1 for' src/components/board/bid-form.tsx \
-    || fail "bid form must clone Claim #1 for"
-  grep -q 'amount-field' src/components/board/bid-form.tsx \
-    || fail "bid form must keep the dashed amount field"
-  grep -q 'Decrease bid by one dollar' src/components/board/bid-form.tsx \
-    || fail "bid form must expose a minus stepper"
-  grep -q 'Increase bid by one dollar' src/components/board/bid-form.tsx \
-    || fail "bid form must expose a plus stepper"
-  grep -q 'name="identity"' src/components/board/bid-form.tsx \
-    || fail "bid form must keep one identity field"
+    || fail "closed empty lane must link to live week"
+  for phrase in 'Claim #1 for' 'amount-field' 'Decrease bid by one dollar' \
+    'Increase bid by one dollar' 'name="identity"' 'name="lane"' '<select'; do
+    grep -q "$phrase" src/components/board/bid-form.tsx \
+      || fail "bid form is missing $phrase"
+  done
   grep -q 'data-empty-bay-list' src/components/board/bid-form.tsx \
-    || fail "live empty claim must stamp the listing write"
-  grep -q 'data-empty-identity' src/components/board/bid-form.tsx \
-    || fail "live empty claim must stamp the identity field"
-  grep -q 'data-empty-identity-first' src/components/board/bid-form.tsx \
-    || fail "live empty identity must lead the claim write"
-  grep -q 'identity-label' src/components/board/bid-form.tsx \
-    || fail "live empty identity must have a visible label"
-  grep -q 'data-empty-bay-list' src/app/globals.css \
-    || fail "live empty identity stamp must be visually certain"
-  grep -q 'data-empty-identity-first' src/app/globals.css \
-    || fail "live empty identity-first write must be visually certain"
-  grep -q 'data-empty-bay-list' tests/rank.test.ts \
-    || fail "rank tests must cover listing on a live empty bay"
-  grep -q 'data-empty-identity' tests/rank.test.ts \
-    || fail "rank tests must stamp the empty-bay identity field"
-  grep -q 'data-empty-identity-first' tests/rank.test.ts \
-    || fail "rank tests must put empty-bay identity before the \$ stepper"
-  grep -q 'data-empty-bay-list' tests/period.test.ts \
-    || fail "period tests must keep closed weeks unstamped for listing"
-  grep -q 'data-empty-identity-first' tests/period.test.ts \
-    || fail "period tests must keep closed weeks unstamped for identity-first"
+    || fail "empty form must stamp its state"
   grep -q 'data-empty-honest' src/components/board/bid-form.tsx \
-    || fail "live empty claim must stamp honesty"
+    || fail "empty form must stamp honest copy"
   grep -q 'data-empty-claim' src/components/board/bid-form.tsx \
-    || fail "live empty claim must stamp Claim #1 as the honest lead"
-  grep -q 'autoFocus={laneEmpty}' src/components/board/bid-form.tsx \
-    || fail "empty week Claim #1 amount must take focus, not identity"
-  if grep -nE 'name="identity"' src/components/board/bid-form.tsx | grep -q autoFocus; then
-    fail "identity field must not steal empty-week first click"
+    || fail "empty form must stamp Claim #1"
+  grep -q 'data-empty-identity' src/components/board/bid-form.tsx \
+    || fail "empty form must stamp its identity field"
+  grep -q 'data-lane-tabs' src/components/board/bid-form.tsx \
+    || fail "empty form must expose one function selector"
+  if grep -nE 'data-first-click="claim"|data-empty-identity-first|autoFocus=\{laneEmpty\}|Pick the function after Claim #1' \
+    src/components/board/bid-form.tsx src/app/globals.css >/dev/null; then
+    fail "empty form must not retain staged claim markers or focus"
   fi
-  grep -q 'data-first-click="claim"' src/components/board/bid-form.tsx \
-    || fail "empty week Outbid must be the certain first click"
-  grep -q 'outbid\[data-first-click="claim"\]' src/app/globals.css \
-    || fail "empty week Outbid first-click must stay visually certain"
-  empty_outbid_rule="$(awk '/\.claim\[data-empty-bay-list\] \.outbid\[data-first-click="claim"\]/,/^\}/' src/app/globals.css)"
-  echo "$empty_outbid_rule" | grep -q 'min-height: 3.15rem' \
-    || fail "empty week Outbid must stay taller than the identity write"
-  if echo "$empty_outbid_rule" | grep -q 'background:'; then
-    fail "empty week Outbid must concentrate first click, not recolor the hiring wall"
+  if grep -nEi 'claim[[:space:]]*#1[[:space:]]*,?[[:space:]]*then[[:space:]]+(pick|choose)[[:space:]]+the[[:space:]]+function' \
+    src/components/board/board.tsx >/dev/null; then
+    fail "empty board mast must not describe a staged claim-to-function hop"
   fi
-  grep -q 'empty week Claim #1 stays the only first click' tests/rank.test.ts \
-    || fail "rank tests must cover empty-week Claim #1 as the only first click"
-  grep -q 'identity field does not steal focus' tests/rank.test.ts \
-    || fail "rank tests must cover identity not stealing empty-week focus"
-  grep -q 'data-first-click="claim"' tests/rank.test.ts \
-    || fail "rank tests must stamp empty-week first-click Claim #1"
-  grep -q 'data-first-click="claim"' tests/period.test.ts \
-    || fail "period tests must keep closed weeks unstamped for first-click Claim #1"
-  if grep -nE 'data-empty-claim-after|data-claim-after-empty-[0-9]|data-empty-claim-first' \
-    src/components/board/bid-form.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "empty Claim #1 first-click must not add a second named hop"
-  fi
-  grep -q 'emptyFirst ? null' src/components/board/board.tsx \
-    || fail "live empty week must not hang eight Function-lane plates in the wall rail"
-  grep -q 'hiring-wall:not(:has(.wall-rail))' src/app/globals.css \
-    || fail "live empty week must drop the eight-plate rail column"
-  grep -q 'name="lane"' src/components/board/bid-form.tsx \
-    || fail "empty week must pick the function after Claim #1"
-  grep -q '<select' src/components/board/bid-form.tsx \
-    || fail "empty week function pick must be one control after Claim #1, not eight plates"
-  grep -q 'empty week Claim #1 is the first click' tests/rank.test.ts \
-    || fail "rank tests must cover empty-week Claim #1 before the function pick"
-  grep -q 'function pick comes after, not eight equal plates' tests/rank.test.ts \
-    || fail "rank tests must keep empty-week function pick off eight equal plates"
-  grep -q 'hiring-wall:not(:has(.wall-rail))' tests/rank.test.ts \
-    || fail "rank tests must cover the empty-week one-column first click"
-  grep -q 'wall-plate' tests/rank.test.ts \
-    || fail "rank tests must keep empty week off eight equal wall plates"
-  grep -q 'wall-rail' tests/period.test.ts \
-    || fail "period tests must keep closed weeks on the occupied wall rail"
-  if grep -nE 'data-empty-lane-pick|data-lane-after-claim|data-empty-function-pick|hiring-wall-empty-first' \
-    src/components/board/bid-form.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "empty week function pick must not add another named hop"
-  fi
-  grep -q 'occupiedLive ? null' src/components/board/board.tsx \
-    || fail "occupied live wall must not hang eight Function-lane plates in the wall rail"
-  grep -q 'occupiedLive ? lanePlates' src/components/board/board.tsx \
-    || fail "occupied live wall must keep Function-lane plates after the listing"
-  grep -q 'wall-bay > .lane-tabs' src/app/globals.css \
-    || fail "occupied Function-lane plates after the listing must stay visually certain"
-  grep -q 'occupied wall keeps one first click' tests/rank.test.ts \
-    || fail "rank tests must cover occupied Apply as the one first click"
-  grep -q 'function plates stay after the listing' tests/rank.test.ts \
-    || fail "rank tests must keep occupied Function-lane plates after the listing"
-  grep -q 'doesNotMatch(occupied, /class="wall-rail"/)' tests/rank.test.ts \
-    || fail "rank tests must drop the occupied wall rail before Apply"
-  grep -q 'wall-rail' tests/period.test.ts \
-    || fail "period tests must keep closed weeks on the occupied wall rail"
-  if grep -nE 'data-occupied-plates|data-plates-after-listing|data-apply-one-first|data-lane-after-listing' \
-    src/components/board/board.tsx src/components/board/listing-card.tsx src/app/globals.css >/dev/null; then
-    fail "occupied Apply first-click must not add another named hop"
-  fi
-  grep -q 'List a role' src/components/board/bid-form.tsx \
-    || fail "empty Claim #1 cut must keep occupied List a role"
-  grep -q 'data-prize-title' src/components/board/listing-card.tsx \
-    || fail "empty Claim #1 cut must keep occupied #1 prize title"
-  grep -q 'data-apply-later-outlined' src/components/board/listing-card.tsx \
-    || fail "empty Claim #1 cut must keep later-rank Apply outlined"
-  grep -q 'className="later-apply"' src/components/board/listing-card.tsx \
-    || fail "empty Claim #1 cut must keep later-rank Apply as later-apply anatomy"
-  grep -q 'data-empty-honest' src/components/board/leaderboard.tsx \
-    || fail "empty and closed-empty weeks must stamp honesty"
-  grep -q 'data-empty-honest' src/app/globals.css \
-    || fail "empty-honest chrome must be visually certain"
-  grep -q 'empty and closed-empty weeks stay honest' tests/rank.test.ts \
-    || fail "rank tests must cover empty-week honesty"
-  grep -q 'data-empty-honest' tests/rank.test.ts \
-    || fail "rank tests must stamp empty-week honesty"
-  grep -q 'data-empty-honest' tests/period.test.ts \
-    || fail "period tests must stamp closed-empty honesty"
-  grep -q 'data-hiring-wall' src/components/board/board.tsx \
-    || fail "board must be a hiring wall, not a generic directory"
-  grep -q 'Function lanes' src/components/board/board.tsx \
-    || fail "function lanes must be first-class wall chrome"
-  grep -q 'Remote (global)' src/components/board/listing-card.tsx \
-    || fail "job card must state remote (global)"
-  grep -q 'Apply' src/components/board/listing-card.tsx \
-    || fail "job card must keep Apply as the outbound CTA"
-  grep -q 'className="apply"' src/components/board/listing-card.tsx \
-    || fail "job card must keep a single Apply control"
-  grep -q 'sheet-apply' src/components/board/listing-card.tsx \
-    || fail "job card must put Apply after the job identity"
-  grep -q 'data-take-apply' src/components/board/listing-card.tsx \
-    || fail "live #1 sheet must stamp the Apply hop"
-  grep -q 'data-apply-live' src/components/board/listing-card.tsx \
-    || fail "live #1 Apply must be the outbound hop"
-  grep -q 'data-apply-live' src/app/globals.css \
-    || fail "live Apply hop must be visually certain"
-  grep -q 'data-apply-after-identity' src/components/board/listing-card.tsx \
-    || fail "occupied #1 Apply must stamp the hop after identity"
-  grep -q 'data-apply-after-identity' src/app/globals.css \
-    || fail "occupied #1 Apply after identity must be visually certain"
-  grep -q 'data-apply-after-identity' tests/rank.test.ts \
-    || fail "rank tests must cover Apply after empty-bay identity leads"
-  grep -q 'data-apply-after-identity' tests/period.test.ts \
-    || fail "period tests must keep closed-week Apply after identity unstamped"
-  grep -q 'data-take-apply' tests/rank.test.ts \
-    || fail "rank tests must cover taking Apply on a live sheet"
-  grep -q 'live={!closed}' src/components/board/leaderboard.tsx \
-    || fail "closed-week sheets must not stamp a live Apply hop"
-  grep -q 'data-take-apply' tests/period.test.ts \
-    || fail "period tests must keep closed-week Apply unstamped"
-  grep -q 'data-later-apply' src/components/board/listing-card.tsx \
-    || fail "live later-rank sheet must stamp the Apply hop"
-  grep -q 'data-apply-later' src/components/board/listing-card.tsx \
-    || fail "live later-rank Apply must be the outbound hop"
-  grep -q 'data-apply-later' src/app/globals.css \
-    || fail "later-rank Apply hop must be visually certain"
-  grep -q 'data-apply-later-outlined' src/components/board/listing-card.tsx \
-    || fail "later-rank Apply must stamp the outlined hop, not a filled #1"
-  grep -q 'data-apply-later-outlined' src/app/globals.css \
-    || fail "later-rank outlined Apply must stay visually certain"
-  grep -q 'data-later-apply' tests/rank.test.ts \
-    || fail "rank tests must cover taking Apply on a later live sheet"
-  grep -q 'data-later-apply' tests/period.test.ts \
-    || fail "period tests must keep closed-week later Apply unstamped"
-  grep -q 'data-list-role' src/components/board/bid-form.tsx \
-    || fail "occupied live claim must stamp List a role"
-  grep -q 'List a role' src/components/board/bid-form.tsx \
-    || fail "occupied live claim must say List a role"
-  grep -q 'list-this-role' src/app/globals.css \
-    || fail "occupied List a role stamp must be visually certain"
-  grep -q 'data-list-role' tests/rank.test.ts \
-    || fail "rank tests must cover listing a role on an occupied live wall"
-  grep -q 'data-list-role' tests/period.test.ts \
-    || fail "period tests must keep closed-week history unstamped for listing"
+  grep -q 'empty lane form is a direct identity-and-function path before one Outbid submit' tests/rank.test.ts \
+    || fail "rank tests must cover direct empty form order"
+  grep -Fq 'claim\s*#1\s*,?\s*then\s+(?:pick|choose)' tests/rank.test.ts \
+    || fail "rank tests must reject staged empty-board mast wording"
+  grep -q 'contract docs keep audit detail while public metadata stays product-facing' tests/rank.test.ts \
+    || fail "rank tests must separate internal contract detail from public metadata"
+  grep -q 'closed empty weeks are read-only' tests/period.test.ts \
+    || fail "period tests must cover closed empty isolation"
+  grep -q 'live rank is not a 24h lock — 25 hours later still occupies' tests/period.test.ts \
+    || fail "period tests must retain the greater-than-24-hour rolling regression"
+  grep -q 'data-slot="lane-rail"' src/components/board/board.tsx \
+    || fail "live wall must render the truthful function rail"
+  grep -q 'grid-template-columns: minmax(15rem, 17rem)' src/app/globals.css \
+    || fail "hiring wall must keep the rail-and-bay layout"
+  grep -q 'emptyFirst' src/components/board/board.tsx \
+    || fail "live empty wall must retain its honest state marker"
+  grep -q 'wall-rail .function-rail' src/app/globals.css \
+    || fail "occupied function rail must remain visually stable"
+  grep -q 'occupied hiring wall keeps one #1 Apply, paid facts, and quieter later cards' tests/rank.test.ts \
+    || fail "rank tests must cover occupied prize and later cards"
+  grep -q 'List a role' src/components/board/bid-form.tsx || fail "occupied form must say List a role"
   grep -q 'data-one-identity' src/components/board/bid-form.tsx \
-    || fail "occupied List a role must stamp one identity field"
-  grep -q 'data-one-identity' src/app/globals.css \
-    || fail "occupied one identity field must be visually certain"
-  if grep -nE 'name="(company|contact)"' src/components/board/bid-form.tsx >/dev/null; then
-    fail "List a role must not ask for a second name"
-  fi
-  grep -q 'does not ask for a second name' tests/rank.test.ts \
-    || fail "rank tests must cover List a role without a second name"
-  grep -q 'data-one-identity' tests/rank.test.ts \
-    || fail "rank tests must stamp one identity field on occupied List a role"
-  grep -q 'data-one-identity' tests/period.test.ts \
-    || fail "period tests must keep closed weeks unstamped for one identity"
-  grep -q 'data-list-after-apply' src/components/board/listing-card.tsx \
-    || fail "occupied #1 must stamp List a role after Apply"
-  grep -q 'after Apply' src/components/board/listing-card.tsx \
-    || fail "list-after-apply hop must sit after Apply"
-  grep -q 'href="#claim"' src/components/board/listing-card.tsx \
-    || fail "list-after-apply hop must jump to #claim"
-  grep -q 'list-after-apply' src/app/globals.css \
-    || fail "occupied List a role after Apply must be visually certain"
-  grep -q 'data-list-after-apply' tests/rank.test.ts \
-    || fail "rank tests must cover listing after occupied Apply"
-  grep -q 'data-list-after-apply' tests/period.test.ts \
-    || fail "period tests must keep closed-week history unstamped for list-after-apply"
+    || fail "occupied form must keep one identity field"
+  grep -q 'Returning employers pay only the difference' src/components/board/bid-form.tsx \
+    || fail "occupied form must explain the raise difference"
+  for phrase in 'data-job-fields' 'name="title"' 'name="company"' \
+    'name="salaryMinUsd"' 'name="salaryMaxUsd"'; do
+    grep -q "$phrase" src/components/board/bid-form.tsx \
+      || fail "occupied form is missing $phrase"
+  done
   grep -q 'data-first-click": "apply"' src/components/board/listing-card.tsx \
-    || fail "occupied #1 Apply must win the first click after List a role"
-  grep -q 'data-first-click="apply"' src/app/globals.css \
-    || fail "first-click Apply must be louder than List a role after Apply"
-  grep -q 'wins the first click after List a role' tests/rank.test.ts \
-    || fail "rank tests must cover Apply winning the first click after List a role"
-  grep -q 'data-first-click="apply"' tests/rank.test.ts \
-    || fail "rank tests must stamp first-click Apply on occupied #1"
-  grep -q 'data-first-click="apply"' tests/period.test.ts \
-    || fail "period tests must keep closed-week first-click Apply unstamped"
-  grep -q 'data-list-after-apply-first' src/components/board/listing-card.tsx \
-    || fail "occupied List a role after Apply must stay certain after first-click Apply"
-  grep -q 'data-list-after-apply-first' src/app/globals.css \
-    || fail "List a role after first-click Apply must be visually certain"
-  grep -q 'stays certain after Apply wins the first click' tests/rank.test.ts \
-    || fail "rank tests must cover List a role after first-click Apply"
-  grep -q 'data-list-after-apply-first' tests/rank.test.ts \
-    || fail "rank tests must stamp List a role after first-click Apply"
-  grep -q 'data-list-after-apply-first' tests/period.test.ts \
-    || fail "period tests must keep closed-week List a role after first-click unstamped"
-  grep -q 'data-apply-after-list-first' src/components/board/listing-card.tsx \
-    || fail "occupied #1 Apply must stay certain after List a role is concentrated"
-  grep -q 'data-apply-after-list-first' src/app/globals.css \
-    || fail "Apply after concentrated List a role must be visually certain"
-  grep -q 'stays certain after List a role is concentrated' tests/rank.test.ts \
-    || fail "rank tests must cover Apply after concentrated List a role"
-  grep -q 'data-apply-after-list-first' tests/rank.test.ts \
-    || fail "rank tests must stamp Apply after concentrated List a role"
-  grep -q 'data-apply-after-list-first' tests/period.test.ts \
-    || fail "period tests must keep closed-week Apply after concentrated List a role unstamped"
-  grep -q 'data-list-after-apply-two' src/components/board/listing-card.tsx \
-    || fail "occupied List a role after Apply must stay certain after Apply is re-concentrated"
-  grep -q 'data-list-after-apply-two' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated must be visually certain"
-  grep -q 'lists after Apply is re-concentrated without another hop' tests/rank.test.ts \
-    || fail "rank tests must cover List a role after Apply is re-concentrated"
-  grep -q 'data-list-after-apply-two' tests/rank.test.ts \
-    || fail "rank tests must stamp List a role after Apply is re-concentrated"
-  grep -q 'data-list-after-apply-two' tests/period.test.ts \
-    || fail "period tests must keep closed-week List a role after Apply is re-concentrated unstamped"
-  grep -q 'data-apply-after-list-two' src/components/board/listing-card.tsx \
-    || fail "occupied #1 Apply must stay certain after List a role is re-concentrated"
-  grep -q 'data-apply-after-list-two' src/app/globals.css \
-    || fail "Apply after List a role is re-concentrated must be visually certain"
-  grep -q 'stays certain after List a role is re-concentrated' tests/rank.test.ts \
-    || fail "rank tests must cover Apply after List a role is re-concentrated"
-  grep -q 'data-apply-after-list-two' tests/rank.test.ts \
-    || fail "rank tests must stamp Apply after List a role is re-concentrated"
-  grep -q 'data-apply-after-list-two' tests/period.test.ts \
-    || fail "period tests must keep closed-week Apply after List a role is re-concentrated unstamped"
-  grep -q 'data-list-after-apply-three' src/components/board/listing-card.tsx \
-    || fail "occupied List a role after Apply must stay certain after Apply is re-concentrated again"
-  grep -q 'data-list-after-apply-three' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated again must be visually certain"
-  grep -q 'lists after Apply is re-concentrated again without another hop' tests/rank.test.ts \
-    || fail "rank tests must cover List a role after Apply is re-concentrated again"
-  grep -q 'data-list-after-apply-three' tests/rank.test.ts \
-    || fail "rank tests must stamp List a role after Apply is re-concentrated again"
-  grep -q 'data-list-after-apply-three' tests/period.test.ts \
-    || fail "period tests must keep closed-week List a role after Apply is re-concentrated again unstamped"
-  grep -q 'data-list-after-apply-four' src/components/board/listing-card.tsx \
-    || fail "occupied List a role must stay certain after Apply is re-concentrated again"
-  grep -q 'data-list-after-apply-four' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated again must stay a full-width dashed hop"
-  grep -q 'min-height: 3.75rem' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated again must stay taller than 3.25rem"
-  grep -q 'lists after Apply is re-concentrated again without another named hop' tests/rank.test.ts \
-    || fail "rank tests must cover List a role after Apply is re-concentrated again without another named hop"
-  grep -q 'data-list-after-apply-four' tests/rank.test.ts \
-    || fail "rank tests must stamp List a role after Apply is re-concentrated again without another named hop"
-  grep -q 'data-list-after-apply-four' tests/period.test.ts \
-    || fail "period tests must keep closed-week List a role after Apply is re-concentrated again unstamped"
-  grep -q 'data-list-after-apply-five' src/components/board/listing-card.tsx \
-    || fail "occupied List a role must stay certain after Apply is re-concentrated again"
-  grep -q 'data-list-after-apply-five' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated again must stay a full-width dashed hop"
-  grep -q 'min-height: 4.25rem' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated again must stay taller than 3.75rem"
-  grep -q 'lists after Apply is re-concentrated again so List a role does not disappear' tests/rank.test.ts \
-    || fail "rank tests must cover List a role after Apply is re-concentrated again so it does not disappear"
-  grep -q 'data-list-after-apply-five' tests/rank.test.ts \
-    || fail "rank tests must stamp List a role after Apply is re-concentrated again so it does not disappear"
-  grep -q 'data-list-after-apply-five' tests/period.test.ts \
-    || fail "period tests must keep closed-week List a role after Apply is re-concentrated again unstamped"
-  grep -q 'data-list-after-apply-six' src/components/board/listing-card.tsx \
-    || fail "occupied List a role must stay certain after Apply is re-concentrated again"
-  grep -q 'data-list-after-apply-six' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated again must stay a full-width dashed hop"
-  grep -q 'min-height: 4.75rem' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated again must stay taller than 4.25rem"
-  grep -q 'lists after Apply is re-concentrated again so List a role does not disappear under Apply' tests/rank.test.ts \
-    || fail "rank tests must cover List a role after Apply is re-concentrated again so it does not disappear under Apply"
-  grep -q 'data-list-after-apply-six' tests/rank.test.ts \
-    || fail "rank tests must stamp List a role after Apply is re-concentrated again so it does not disappear under Apply"
-  grep -q 'data-list-after-apply-six' tests/period.test.ts \
-    || fail "period tests must keep closed-week List a role after Apply is re-concentrated again unstamped"
-  grep -q 'data-list-after-apply-seven' src/components/board/listing-card.tsx \
-    || fail "occupied List a role must stay certain after Apply is re-concentrated again"
-  grep -q 'data-list-after-apply-seven' src/app/globals.css \
-    || fail "List a role after Apply is re-concentrated again must stay a full-width dashed hop"
-  grep -q 'lists after Apply is re-concentrated again so List a role does not disappear under that louder Apply' tests/rank.test.ts \
-    || fail "rank tests must cover List a role after Apply is re-concentrated again so it does not disappear under that louder Apply"
-  grep -q 'data-list-after-apply-seven' tests/rank.test.ts \
-    || fail "rank tests must stamp List a role after Apply is re-concentrated again so it does not disappear under that louder Apply"
-  grep -q 'data-list-after-apply-seven' tests/period.test.ts \
-    || fail "period tests must keep closed-week List a role after Apply is re-concentrated again unstamped"
-  grep -q 'data-apply-after-list-three' src/components/board/listing-card.tsx \
-    || fail "occupied #1 Apply must stay certain after List a role is re-concentrated again"
-  grep -q 'data-apply-after-list-three' src/app/globals.css \
-    || fail "Apply after List a role is re-concentrated again must be visually certain"
-  grep -q 'stays certain after List a role is re-concentrated again' tests/rank.test.ts \
-    || fail "rank tests must cover Apply after List a role is re-concentrated again"
-  grep -q 'data-apply-after-list-three' tests/rank.test.ts \
-    || fail "rank tests must stamp Apply after List a role is re-concentrated again"
-  grep -q 'data-apply-after-list-three' tests/period.test.ts \
-    || fail "period tests must keep closed-week Apply after List a role is re-concentrated again unstamped"
-  grep -q 'data-apply-after-list-four' src/components/board/listing-card.tsx \
-    || fail "occupied #1 Apply must stay certain after List a role is re-concentrated again without another named hop"
-  grep -q 'data-apply-after-list-four' src/app/globals.css \
-    || fail "Apply after List a role is re-concentrated again must stay a filled hop taller than dashed List"
-  grep -q 'min-height: 5.15rem' src/app/globals.css \
-    || fail "Apply after List a role is re-concentrated again must stay taller than 4.65rem"
-  grep -q 'stays certain after List a role is re-concentrated again without another named hop' tests/rank.test.ts \
-    || fail "rank tests must cover Apply after List a role is re-concentrated again without another named hop"
-  grep -q 'data-apply-after-list-four' tests/rank.test.ts \
-    || fail "rank tests must stamp Apply after List a role is re-concentrated again without another named hop"
-  grep -q 'data-apply-after-list-four' tests/period.test.ts \
-    || fail "period tests must keep closed-week Apply after List a role is re-concentrated again unstamped"
-  grep -q 'data-apply-after-list-five' src/components/board/listing-card.tsx \
-    || fail "occupied #1 Apply must stay certain after List a role is re-concentrated again so Apply does not disappear"
-  grep -q 'data-apply-after-list-five' src/app/globals.css \
-    || fail "Apply after List a role is re-concentrated again must stay a filled hop taller than dashed List"
-  grep -q 'min-height: 5.65rem' src/app/globals.css \
-    || fail "Apply after List a role is re-concentrated again must stay taller than 5.15rem"
-  grep -q 'stays certain after List a role is re-concentrated again so Apply does not disappear' tests/rank.test.ts \
-    || fail "rank tests must cover Apply after List a role is re-concentrated again so Apply does not disappear"
-  grep -q 'data-apply-after-list-five' tests/rank.test.ts \
-    || fail "rank tests must stamp Apply after List a role is re-concentrated again so Apply does not disappear"
-  grep -q 'data-apply-after-list-five' tests/period.test.ts \
-    || fail "period tests must keep closed-week Apply after List a role is re-concentrated again unstamped"
-  grep -q 'data-apply-after-list-six' src/components/board/listing-card.tsx \
-    || fail "occupied #1 Apply must stay certain after List a role is re-concentrated again so Apply does not disappear under List"
-  grep -q 'data-apply-after-list-six' src/app/globals.css \
-    || fail "Apply after List a role is re-concentrated again must stay a filled hop taller than dashed List"
-  grep -q 'min-height: 6.15rem' src/app/globals.css \
-    || fail "Apply after List a role is re-concentrated again must stay taller than 5.65rem"
-  grep -q 'stays certain after List a role is re-concentrated again so Apply does not disappear under List' tests/rank.test.ts \
-    || fail "rank tests must cover Apply after List a role is re-concentrated again so Apply does not disappear under List"
-  grep -q 'data-apply-after-list-six' tests/rank.test.ts \
-    || fail "rank tests must stamp Apply after List a role is re-concentrated again so Apply does not disappear under List"
-  grep -q 'data-apply-after-list-six' tests/period.test.ts \
-    || fail "period tests must keep closed-week Apply after List a role is re-concentrated again unstamped"
-  grep -q 'laneEmpty ? claimForm : null' src/components/board/board.tsx \
-    || fail "empty week must keep Claim #1 above the empty bay"
-  grep -q 'laneEmpty ? null : claimForm' src/components/board/board.tsx \
-    || fail "occupied wall must put List a role after the prize sheets"
-  grep -q 'claim\[data-list-role\]' src/app/globals.css \
-    || fail "occupied List a role claim must stay visually quieter than Apply #1"
-  list_hop_rule="$(awk '/\.list-after-apply\[data-list-after-apply\]\[data-list-after-apply-first\]\[data-list-after-apply-two\]\[data-list-after-apply-three\]\[data-list-after-apply-four\]\[data-list-after-apply-five\]\[data-list-after-apply-six\]\[data-list-after-apply-seven\] \{/,/^\}/' src/app/globals.css)"
-  echo "$list_hop_rule" | grep -q 'display: inline' \
-    || fail "occupied List a role hop must stay inline quieter than filled Apply"
-  echo "$list_hop_rule" | grep -q 'min-height: 0' \
-    || fail "occupied List a role hop must not stay a 5.25rem first click"
-  if echo "$list_hop_rule" | grep -q 'min-height: 5.25rem'; then
-    fail "occupied List a role hop must not stay taller than Apply as a first click"
-  fi
-  grep -q 'occupied List a role stays quieter than Apply #1' tests/rank.test.ts \
-    || fail "rank tests must cover occupied List a role quieter than Apply #1"
-  if grep -nE 'data-list-after-apply-eight|data-apply-after-list-seven|data-list-quiet-after|data-apply-one-first' \
-    src/components/board/listing-card.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "occupied List a role quieter than Apply must not add a second named hop"
-  fi
-  grep -q 'export function isPaidListing' src/lib/rank.ts \
-    || fail "rank.ts must expose isPaidListing so unpaid never ranks"
-  grep -q 'export function paidListings' src/lib/rank.ts \
-    || fail "rank.ts must drop unpaid rows before ranking"
-  grep -q 'paidListings(listings)' src/lib/rank.ts \
-    || fail "rankListings must rank paid Polar rows only"
-  grep -q 'isPaidListing(row)' src/lib/store.ts \
-    || fail "store listPaid must drop unpaid rows"
-  grep -q 'if (!isPaidListing(listing)) return;' src/lib/store.ts \
-    || fail "store insertPaid must refuse unpaid occupancy"
-  grep -q 'paidListings(defaultBoardStore.listPaid' src/lib/board.ts \
-    || fail "board loader must compose paid Polar rows only"
-  grep -q 'const paid = rankListings(listings)' src/components/board/board.tsx \
-    || fail "hiring wall occupancy must compose paid Polar rows only"
-  grep -q 'listings={paid}' src/components/board/board.tsx \
-    || fail "hiring wall must pass paid occupancy to the leaderboard"
-  grep -q 'listings = rankListings(listings)' src/components/board/leaderboard.tsx \
-    || fail "leaderboard must drop unpaid occupancy before #1"
-  grep -q 'if (!isPaidListing(listing)) return null' src/components/board/listing-card.tsx \
-    || fail "listing card must not print unpaid #1 / Apply"
-  grep -q 'unpaid stays off the hiring wall' tests/rank.test.ts \
-    || fail "rank tests must keep unpaid occupancy off the hiring wall"
-  grep -q 'No #1 until Polar reports paid' tests/rank.test.ts \
-    || fail "rank tests must wait for Polar paid before #1"
-  grep -q 'closed-week unpaid rows stay off the wall' tests/period.test.ts \
-    || fail "period tests must keep closed-week unpaid occupancy off the wall"
-  if grep -nE 'data-unpaid-off|data-paid-only-wall|data-unpaid-off-board|data-list-after-apply-eight' \
-    src/components/board/listing-card.tsx src/components/board/board.tsx \
-    src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
-    fail "unpaid-off occupancy must not add another named hop"
-  fi
-  grep -q 'data-salary' src/components/board/listing-card.tsx \
-    || fail "job card must render optional salary as a fact"
-  grep -q 'data-prize-title' src/components/board/listing-card.tsx \
-    || fail "occupied #1 must stamp the role title as the prize"
-  grep -q 'data-prize-title' src/app/globals.css \
-    || fail "occupied #1 prize title must be visually certain"
-  grep -q 'clamp(1.55rem' src/app/globals.css \
-    || fail "occupied #1 prize title must read larger than \$bid + clicks"
-  grep -q 'role title is the prize before' tests/rank.test.ts \
-    || fail "rank tests must cover prize-before-price on occupied #1"
-  grep -q 'data-prize-title' tests/rank.test.ts \
-    || fail "rank tests must stamp the occupied #1 prize title"
-  grep -q 'data-prize-title' tests/period.test.ts \
-    || fail "period tests must keep empty/closed weeks honest about the prize title"
-  grep -q 'data-later-fact' src/components/board/listing-card.tsx \
-    || fail "occupied #1 must stamp \$bid + clicks as a later fact"
-  grep -q 'meta\[data-later-fact\]' src/app/globals.css \
-    || fail "occupied #1 later-fact money must stay quieter than the prize title"
-  grep -q 'meta\[data-later-fact\] .bid' src/app/globals.css \
-    || fail "occupied #1 later-fact \$bid must stay muted beside the prize title"
-  grep -q 'meta\[data-later-fact\] .clicks' src/app/globals.css \
-    || fail "occupied #1 later-fact clicks must stay muted beside the prize title"
-  grep -q 'stays a later fact' tests/rank.test.ts \
-    || fail "rank tests must keep occupied #1 \$bid a later fact"
-  grep -q 'data-later-fact' tests/rank.test.ts \
-    || fail "rank tests must stamp occupied #1 \$bid as a later fact"
-  grep -q 'data-later-fact' tests/period.test.ts \
-    || fail "period tests must keep empty/closed weeks honest about later-fact \$bid"
+    || fail "#1 Apply must remain the first action"
+  grep -q 'data-apply-state": "first"' src/components/board/listing-card.tsx \
+    || fail "#1 Apply must expose first-action state"
+  grep -q 'data-take-apply' src/components/board/listing-card.tsx \
+    || fail "#1 Apply must expose take-apply state"
+  grep -q 'data-apply-live' src/components/board/listing-card.tsx \
+    || fail "#1 Apply must be an outbound live action"
+  grep -q 'data-list-action="role"' src/components/board/listing-card.tsx \
+    || fail "#1 must keep the List a role action"
+  grep -q 'data-apply-later-outlined' src/components/board/listing-card.tsx \
+    || fail "later Apply must stay outlined"
   grep -q 'data-later-quiet' src/components/board/listing-card.tsx \
-    || fail "later ranks must stamp quieter type/outline/chrome than occupied #1"
-  grep -q 'data-later-quiet' src/app/globals.css \
-    || fail "later-rank quiet chrome must be visually certain"
-  grep -q 'data-later-pack' src/components/board/leaderboard.tsx \
-    || fail "occupied later ranks must group after the #1 prize pack"
+    || fail "later cards must stay quiet"
+  grep -q 'data-prize-title' src/components/board/listing-card.tsx \
+    || fail "#1 must expose prize title"
+  grep -q 'data-later-fact' src/components/board/listing-card.tsx \
+    || fail "#1 money/clicks must remain later facts"
   grep -q 'data-prize-pack' src/components/board/leaderboard.tsx \
-    || fail "occupied #1 must stay in its own prize pack"
+    || fail "#1 must have its own prize pack"
+  grep -q 'data-later-pack' src/components/board/leaderboard.tsx \
+    || fail "later cards must have a separate pack"
   grep -q 'leaderboard-later' src/components/board/leaderboard.tsx \
-    || fail "later ranks must use a later leaderboard, not the prize grid"
-  grep -q 'leaderboard-later' src/app/globals.css \
-    || fail "later-rank pack must stay visually certain as a roster"
-  grep -q 'later-sheet' src/components/board/listing-card.tsx \
-    || fail "later-rank cards must use later-sheet anatomy, not the #1 job-sheet"
-  grep -q 'later-sheet' src/app/globals.css \
-    || fail "later-sheet roster chrome must be visually certain"
-  grep -q 'data-later-role' src/components/board/listing-card.tsx \
-    || fail "later-rank titles must sit on later-role, not the #1 prize title node"
-  grep -q 'later-sheet\[data-later-quiet\] \.later-role' src/app/globals.css \
-    || fail "later-rank role line must stay quieter than the occupied #1 prize"
-  later_role_rule="$(awk '/\.later-sheet\[data-later-quiet\] \.later-role \{/,/^\}/' src/app/globals.css)"
-  echo "$later_role_rule" | grep -q 'font-size: 0.92rem' \
-    || fail "later-rank titles must read smaller than the occupied #1 prize"
-  if echo "$later_role_rule" | grep -q 'var(--muted)'; then
-    fail "later-rank titles must recede by anatomy, not --muted on the prize title node"
+    || fail "later cards must use a later roster"
+  grep -q 'if (!isPaidListing(listing)) return null' src/components/board/listing-card.tsx \
+    || fail "unpaid rows must not render"
+  grep -q 'paidListings(listings)' src/lib/rank.ts || fail "rank must filter unpaid rows"
+  grep -q 'isPaidListing(row)' src/lib/store.ts || fail "store must filter unpaid rows"
+  grep -q 'if (!isPaidListing(listing)) return;' src/lib/store.ts \
+    || fail "store must refuse unpaid inserts"
+  grep -q 'unpaid stays off the hiring wall' tests/rank.test.ts \
+    || fail "rank tests must cover unpaid off-board behavior"
+  grep -q 'rank is the bid, and older paid rows win equal bids' tests/rank.test.ts \
+    || fail "rank tests must cover bid/tie hierarchy"
+  grep -q 'hiring wall keeps its composition' tests/rank.test.ts \
+    || fail "rank tests must cover hiring-wall composition"
+  grep -q 'closed empty and occupied boards isolate live actions' tests/rank.test.ts \
+    || fail "rank tests must cover closed state isolation"
+  if grep -nE 'data-(?:list-after-apply-(?:first|two|three|four|five|six|seven|eight|N)|apply-after-list-(?:first|two|three|four|five|six|seven|eight|N)|apply-after-identity|empty-lane-pick|lane-after-claim|empty-function-pick|rolling-week-hop|rolling-strip|last-7d-strip|week-window-hop)' \
+    src/components/board/*.tsx src/app/globals.css >/dev/null; then
+    fail "generated named hop markers must stay absent"
   fi
-  if echo "$later_role_rule" | grep -q '0.78rem'; then
-    fail "later-rank titles must not stamp-mute the prize title at 0.78rem"
-  fi
-  if grep -nE 'data-later-quiet\] \.title|\.title\[data-later-quiet\]' src/app/globals.css >/dev/null; then
-    fail "later-rank titles must not mute the same .title node as occupied #1"
-  fi
-  if grep -nE 'data-later-title|data-title-later-quiet|data-later-quiet-title|data-later-title-quiet' \
-    src/components/board/listing-card.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
-    fail "later-rank titles must not add a stamp-only mute on the same title node"
-  fi
-  grep -q 'occupied later-rank titles stay quieter than #1' tests/rank.test.ts \
-    || fail "rank tests must cover later-rank titles quieter than the #1 prize"
-  grep -q 'later-rank titles stay quieter than #1' tests/rank.test.ts \
-    || fail "rank tests must cover quieter later-rank titles on an occupied wall"
-  grep -q 'data-later-pack' tests/rank.test.ts \
-    || fail "rank tests must stamp the later-rank pack"
-  grep -q 'data-later-pack' tests/period.test.ts \
-    || fail "period tests must keep empty/closed weeks honest about the later-rank pack"
-  grep -q 'data-later-role' tests/rank.test.ts \
-    || fail "rank tests must stamp later-rank titles as later-role"
-  grep -q 'data-later-role' tests/period.test.ts \
-    || fail "period tests must keep empty/closed weeks honest about later-role titles"
-  grep -q 'className="later-apply"' src/components/board/listing-card.tsx \
-    || fail "later-rank Apply must sit on later-apply, not the #1 filled hop"
-  grep -q 'later-apply' src/app/globals.css \
-    || fail "later-apply roster hop must be visually certain"
-  grep -q 'later-sheet\[data-later-quiet\] \.later-apply' src/app/globals.css \
-    || fail "later-rank Apply must stay outlined by later-apply anatomy"
-  later_apply_rule="$(awk '/\.later-sheet\[data-later-quiet\] \.later-apply\[data-apply-later\]\[data-apply-later-outlined\] \{/,/^\}/' src/app/globals.css)"
-  echo "$later_apply_rule" | grep -q 'border: 1px solid var(--fg)' \
-    || fail "later-rank Apply must stay an outline, not a filled #1 hop"
-  echo "$later_apply_rule" | grep -q 'background: transparent' \
-    || fail "later-rank Apply must stay outlined, not filled like occupied #1"
-  if echo "$later_apply_rule" | grep -q 'var(--sheet)'; then
-    fail "later-rank Apply must recede by anatomy, not fill like occupied #1"
-  fi
-  if grep -nE 'data-later-quiet\] \.apply[^-]|[^a-z-]apply\[data-apply-later\]|[^a-z-]apply\[data-later-quiet\]' src/app/globals.css >/dev/null; then
-    fail "later-rank Apply must not mute the same .apply node as occupied #1"
-  fi
-  if grep -nE 'className="apply"' src/components/board/listing-card.tsx | grep -q apply-later; then
-    fail "later-rank Apply must not stamp-mute the same .apply hop as occupied #1"
-  fi
-  if grep -nE 'data-apply-later-mute|data-later-apply-quiet|data-apply-later-quiet|data-later-apply-outlined|data-apply-later-two' \
-    src/components/board/listing-card.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
-    fail "later-rank Apply must not add a stamp-only mute on the same Apply hop"
-  fi
-  grep -q 'apply\[data-apply-later\]' src/app/globals.css \
-    || fail "later-rank Apply must stay an outlined hop"
-  grep -q 'apply\[data-apply-later\]\[data-apply-later-outlined\]' src/app/globals.css \
-    || fail "later-rank Apply must stay outlined on the existing hop"
-  grep -q 'border: 1px solid var(--fg)' src/app/globals.css \
-    || fail "later-rank Apply must stay an outline, not a filled #1 hop"
-  grep -q 'background: transparent' src/app/globals.css \
-    || fail "later-rank Apply must stay outlined, not filled like occupied #1"
-  grep -q 'later ranks stay quieter than occupied #1' tests/rank.test.ts \
-    || fail "rank tests must cover quieter later ranks on an occupied wall"
-  grep -q 'later-rank Apply stays outlined' tests/rank.test.ts \
-    || fail "rank tests must keep later-rank Apply outlined — filled Apply is #1 only"
-  grep -q 'class="later-apply"' tests/rank.test.ts \
-    || fail "rank tests must stamp later-rank Apply as later-apply anatomy"
-  grep -q 'class="later-apply"' tests/period.test.ts \
-    || fail "period tests must keep closed-week later Apply on later-apply anatomy"
-  grep -q 'data-apply-later-outlined' tests/rank.test.ts \
-    || fail "rank tests must stamp later-rank Apply as outlined"
-  grep -q 'data-apply-later-outlined' tests/period.test.ts \
-    || fail "period tests must keep closed-week later Apply unstamped for outline"
-  grep -q 'data-later-quiet' tests/rank.test.ts \
-    || fail "rank tests must stamp quieter later ranks"
-  grep -q 'data-later-quiet' tests/period.test.ts \
-    || fail "period tests must keep empty/closed weeks honest about later-rank quiet"
-  grep -q 'hiring wall' tests/rank.test.ts \
-    || fail "rank tests must cover the hiring-wall layout"
-  if grep -nE 'top company|featured employer|star rating' \
+  if grep -nE 'top company|featured employer|star rating|review count|Google Maps|OpenStreetMap' \
     src/components/board/*.tsx src/app/page.tsx >/dev/null; then
-    fail "hiring wall must not add social proof"
+    fail "hiring wall must not invent social proof or maps"
   fi
-  grep -q 'getBoardListings' src/lib/board.ts \
-    || fail "board.ts must expose getBoardListings"
-  grep -q 'rankListings' src/app/page.tsx \
-    || fail "page.tsx must rank listings through rankListings"
-  grep -q 'getBoardListings' src/app/page.tsx \
-    || fail "page.tsx must load the board through getBoardListings"
-  grep -q 'export function planCheckout' src/lib/listing.ts \
-    || fail "listing.ts must export planCheckout"
-  grep -q 'export function applyPaidCheckout' src/lib/listing.ts \
-    || fail "listing.ts must apply paid create/raise"
+
+  echo "== listing and payment flow contracts =="
+  grep -q 'getBoardListings' src/app/page.tsx || fail "board page must load board listings"
+  grep -q 'rankListings' src/app/page.tsx || fail "board page must rank listings"
+  grep -q 'export function planCheckout' src/lib/listing.ts || fail "listing must plan checkout"
+  grep -q 'export function applyPaidCheckout' src/lib/listing.ts || fail "listing must apply paid checkout"
   for code in raise_too_small raise_not_owner identity_taken; do
-    grep -q "$code" src/lib/listing.ts \
-      || fail "listing.ts must emit $code"
-    grep -q "$code" tests/checkout.test.ts \
-      || fail "checkout tests must cover $code"
+    grep -q "$code" src/lib/listing.ts || fail "listing must emit $code"
+    grep -q "$code" tests/checkout.test.ts || fail "checkout tests must cover $code"
   done
-  grep -q 'chargeUsd' src/lib/listing.ts \
-    || fail "listing.ts must charge the raise difference"
-  grep -q 'planCheckout' src/app/checkout/route.ts \
-    || fail "checkout route must plan raise vs create"
-  grep -q 'planCheckout' src/payments/fixture.ts \
-    || fail "fixture checkout must re-check raise rules"
-  if grep -nE '\b(Acme|Google|Stripe)\b' src/lib/board.ts src/app/page.tsx >/dev/null; then
-    fail "live board must not invent company listings"
-  fi
-
-  echo "== about and rules pages =="
-  for f in src/app/about/page.tsx src/app/rules/page.tsx tests/pages.test.ts; do
-    [[ -f "$f" ]] || fail "missing $f"
-    [[ -s "$f" ]] || fail "empty $f"
-  done
-  grep -q 'href="/about"' src/app/layout.tsx || fail "board nav must link to /about"
-  grep -q 'href="/rules"' src/app/layout.tsx || fail "board nav must link to /rules"
-  grep -q 'no ads' src/app/about/page.tsx || fail "about must state no ads"
-  grep -q 'no API keys' src/app/about/page.tsx || fail "about must state no API keys"
-  grep -q 'no revenue share' src/app/about/page.tsx || fail "about must state no revenue share"
-  grep -q 'Rank is the bid' src/app/about/page.tsx || fail "about must state rank is the bid"
-  grep -q 'global remote' src/app/about/page.tsx || fail "about must state global remote"
-  grep -q '≥ $5' src/app/rules/page.tsx || fail "rules must state min $5"
-  grep -q '$50,000' src/app/rules/page.tsx || fail "rules must state max $50,000"
-  grep -q 'Monday 00:00' src/app/rules/page.tsx || fail "rules must state Monday 00:00 as weekId audit"
-  grep -q 'rolling last 7 days' src/app/rules/page.tsx \
-    || fail "rules must state rolling last 7 days from paid placement"
-  grep -q 'audit label' src/app/rules/page.tsx \
-    || fail "rules must keep weekId as an audit label"
-  grep -q 'never invent salaries' src/app/rules/page.tsx || fail "rules must forbid invented salaries"
-  grep -q 'newBid − currentBid' src/app/rules/page.tsx || fail "rules must state raise-the-difference"
-  grep -q 'Telegram' src/app/rules/page.tsx || fail "rules must document chat-link rejects"
-  grep -q 'NSFW' src/app/rules/page.tsx || fail "rules must document NSFW rejects"
-
-  echo "== anti-spam URL rules =="
-  for f in src/lib/urls.ts tests/urls.test.ts; do
-    [[ -f "$f" ]] || fail "missing $f"
-    [[ -s "$f" ]] || fail "empty $f"
-  done
-  grep -q 'export function canonicalizeApplyUrl' src/lib/urls.ts \
-    || fail "urls.ts must export canonicalizeApplyUrl"
-  grep -q 'export function outboundApplyUrl' src/lib/urls.ts \
-    || fail "urls.ts must export outboundApplyUrl"
-  for code in invalid_url tracking_stripped_empty chat_link_forbidden \
-    nsfw_forbidden shortener_unresolved; do
-    grep -q "$code" src/lib/urls.ts || fail "urls.ts must emit $code"
-    grep -q "$code" tests/urls.test.ts || fail "url tests must cover $code"
-  done
-  grep -q 'utm_' tests/urls.test.ts || fail "url tests must strip tracking query"
-  grep -q 't.me' tests/urls.test.ts || fail "url tests must reject Telegram"
-  grep -q 'onlyfans' tests/urls.test.ts || fail "url tests must reject NSFW"
-  grep -q 'SHORTENER_FIXTURES\|resolveShortener' tests/urls.test.ts \
-    || fail "url tests must resolve shorteners via fixtures"
-  if grep -nE '[^a-zA-Z_]fetch\(' src/lib/urls.ts >/dev/null; then
-    fail "urls.ts must not call global fetch (tests stay offline)"
-  fi
-  echo "== weekly reset + public apply clicks =="
-  for f in src/lib/period.ts src/app/out/\[id\]/route.ts tests/period.test.ts; do
-    [[ -f "$f" ]] || fail "missing $f"
-    [[ -s "$f" ]] || fail "empty $f"
-  done
-  grep -q 'export function isoWeekPeriodId' src/lib/period.ts \
-    || fail "period.ts must export isoWeekPeriodId"
-  grep -q 'export function currentPeriodMeta' src/lib/period.ts \
-    || fail "period.ts must export currentPeriodMeta"
-  grep -q 'export function resolveBoardPeriod' src/lib/period.ts \
-    || fail "period.ts must resolve ?period= closed weeks"
-  grep -q 'Monday' src/lib/period.ts \
-    || fail "period.ts must document Monday 00:00 UTC as weekId audit"
-  grep -q 'ROLLING_WEEK_MS' src/lib/period.ts \
-    || fail "period.ts must export the rolling 7-day window"
-  grep -q '7 \* DAY_MS' src/lib/period.ts \
-    || fail "live rank window must be 7 days, not a 24h lock"
-  grep -q 'export function isInRollingWeek' src/lib/period.ts \
-    || fail "period.ts must test paid placement against the rolling last 7 days"
-  grep -q 'export function liveRankResetAt' src/lib/period.ts \
-    || fail "period.ts must expire occupied rank from paid placement"
-  grep -q 'export function placementExpiresAt' src/lib/period.ts \
-    || fail "period.ts must compute 7 days from paid placement"
-  if grep -nE 'ROLLING_WINDOW_MS = 24|24 \* 60 \* 60 \* 1000' src/lib/period.ts src/lib/board.ts src/lib/store.ts >/dev/null; then
-    fail "live rank must not be a 24h lock on #1"
-  fi
-  grep -q 'listPaidRolling' src/lib/store.ts \
-    || fail "store must list paid occupancy by rolling last 7 days"
-  grep -q 'findLiveByIdentity' src/lib/store.ts \
-    || fail "store must raise against the rolling window, not weekId"
-  grep -q 'listPaidRolling' src/lib/board.ts \
-    || fail "live board query must read rolling last-7-days occupancy"
-  grep -q 'export async function GET' src/app/out/\[id\]/route.ts \
-    || fail "click route must export GET"
-  grep -q 'NextResponse.redirect' src/app/out/\[id\]/route.ts \
-    || fail "click route must 302 to the apply URL"
-  grep -q 'incrementClicks' src/app/out/\[id\]/route.ts \
-    || fail "click route must increment public clicks"
-  grep -q 'outboundApplyUrl' src/app/out/\[id\]/route.ts \
-    || fail "click route must use the canonical outbound URL"
-  grep -q 'resolveBoardPeriod' src/app/page.tsx \
-    || fail "board must resolve the period via resolveBoardPeriod"
-  grep -q 'params.period' src/app/page.tsx \
-    || fail "board must accept ?period="
-  grep -q 'getLiveBoardListings' src/lib/board.ts \
-    || fail "board.ts must expose getLiveBoardListings"
-  grep -q 'getLiveBoardListings' src/app/page.tsx \
-    || fail "live board must load rolling last-7-days occupancy"
-  grep -q 'liveRankResetAt' src/app/page.tsx \
-    || fail "live board must reset from paid placement, not Monday 00:00 UTC"
-  grep -q 'data-week-window={occupiedLive ? "rolling-7d"' src/components/board/board.tsx \
-    || fail "occupied live wall must stamp the rolling last-7-days window"
-  grep -q 'data-empty-window' src/components/board/board.tsx \
-    || fail "empty live wall must name its own rolling window, not occupied week-window chrome"
-  grep -q 'Rolling last 7 days from paid placement. Not Monday 00:00 UTC.' src/components/board/board.tsx \
-    || fail "empty live wall must name rolling last 7 days and drop Monday 00:00 UTC"
-  grep -q 'This remote (global) wall is empty' src/components/board/board.tsx \
-    || fail "empty live wall must drop This week's remote wall Monday copy"
-  grep -q 'The last 7 days from paid placement are empty' src/components/board/bid-form.tsx \
-    || fail "empty claim note must name last 7 days from paid placement"
-  if grep -nE 'This week is empty' src/components/board/bid-form.tsx >/dev/null; then
-    fail "empty claim note must not say This week is empty"
-  fi
-  grep -q 'Rolling last 7 days from paid placement' src/components/board/board.tsx \
-    || fail "live wall must say rolling last 7 days from paid placement"
-  grep -q 'audit label' src/components/board/board.tsx \
-    || fail "live wall must keep weekId as an audit label"
-  if grep -nE 'data-rolling-week-hop|data-rolling-strip|data-last-7d-strip|data-week-window-hop' \
-    src/components/board/board.tsx src/components/board/listing-card.tsx src/app/globals.css >/dev/null; then
-    fail "rolling last-7-days window must not add a second named hop"
-  fi
-  if grep -nE 'data-list-after-apply-eight|data-list-after-apply-N' \
-    src/components/board/listing-card.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "rolling week must not stamp list-after-apply-N"
-  fi
+  grep -q 'chargeUsd' src/lib/listing.ts || fail "raises must charge the difference"
+  grep -q 'planCheckout' src/app/checkout/route.ts || fail "checkout route must plan raises"
+  grep -q 'planCheckout' src/payments/fixture.ts || fail "fixture checkout must re-check raises"
+  grep -q 'on the board' src/app/return/page.tsx || fail "return page must show paid success"
+  grep -q 'No rank claimed' src/app/return/page.tsx || fail "return page must show cancel truth"
+  grep -q 'data-complete-state' src/app/checkout/complete/page.tsx \
+    || fail "completion page must expose truthful states"
+  grep -q 'data-hiring-wall' src/components/board/board.tsx \
+    || fail "board must identify as a hiring wall"
+  grep -q 'Function lanes' src/components/board/board.tsx \
+    || fail "function lanes must remain first-class"
+  grep -q 'Remote (global)' src/components/board/listing-card.tsx \
+    || fail "cards must state remote global"
   grep -q 'href={applyClickPath' src/components/board/listing-card.tsx \
-    || fail "listing card must link Apply through /out/:id"
+    || fail "Apply must route through the click path"
   grep -q 'data-clicks' src/components/board/listing-card.tsx \
-    || fail "listing card must show public clicks"
-  grep -q 'Monday 00:00 UTC' tests/period.test.ts \
-    || fail "period tests must cover Monday 00:00 UTC"
-  grep -q 'rolling last 7 days from paid placement' tests/period.test.ts \
-    || fail "period tests must cover rolling last 7 days from paid placement"
-  grep -q 'not a 24h lock' tests/period.test.ts \
-    || fail "period tests must keep live rank off a 24h lock on #1"
-  grep -q 'getLiveBoardListings' tests/period.test.ts \
-    || fail "period tests must drop old bids from the live query"
-  grep -q 'data-week-window="rolling-7d"' tests/period.test.ts \
-    || fail "period tests must stamp the occupied rolling window"
-  grep -q 'data-week-window="rolling-7d"' tests/rank.test.ts \
-    || fail "rank tests must cover occupied rolling last-7-days composition"
-  grep -q 'occupied week window is rolling last 7 days' tests/rank.test.ts \
-    || fail "rank tests must cover occupied rolling last-7-days week window"
-  grep -q 'empty wall copy is rolling last 7 days' tests/rank.test.ts \
-    || fail "rank tests must cover empty rolling last-7-days copy"
-  grep -q 'data-empty-window=""' tests/rank.test.ts \
-    || fail "rank tests must stamp empty window copy without occupied week-window chrome"
-  grep -q 'This remote (global) {laneLabel(lane)} wall is the rolling last 7 days from paid placement' src/components/board/board.tsx \
-    || fail "occupied live fact must name the same rolling last-7-days window as empty"
-  grep -q 'occupied live fact is rolling last 7 days' tests/rank.test.ts \
-    || fail "rank tests must cover occupied live fact rolling last-7-days copy"
-  if grep -nE "occupiedLive \?" src/components/board/board.tsx | grep -q "This week"; then
-    fail "occupied live fact must not print This week's remote wall"
-  fi
-  grep -q 'Rolling last 7 days #1' src/components/board/leaderboard.tsx \
-    || fail "occupied live prize pack must name rolling last 7 days — not This week's #1"
-  grep -q 'Later ranks in the rolling last 7 days' src/components/board/leaderboard.tsx \
-    || fail "occupied live later pack must name the same rolling last-7-days window as the fact"
-  grep -q 'occupied prize/later labels are rolling last 7 days' tests/rank.test.ts \
-    || fail "rank tests must cover occupied prize/later rolling last-7-days labels"
-  grep -q 'Rolling last 7 days #1' tests/period.test.ts \
-    || fail "period tests must keep occupied live prize labels on the rolling window"
-  if grep -nE 'data-rolling-prize|data-rolling-later|data-occupied-label-hop|data-prize-window-hop' \
-    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "occupied prize/later labels must not add a second named hop"
-  fi
-  grep -q 'Open the live {laneLabel(lane)} wall for the rolling last 7 days from paid placement' src/components/board/leaderboard.tsx \
-    || fail "closed empty live-pointer must name rolling last 7 days from paid placement — not this week's live wall"
-  grep -q 'closed empty live-pointer is rolling last 7 days' tests/rank.test.ts \
-    || fail "rank tests must cover closed empty live-pointer rolling last-7-days copy"
-  grep -q 'Open the live Backend wall for the rolling last 7 days from paid placement' tests/period.test.ts \
-    || fail "period tests must point closed empty at the rolling last-7-days live wall"
-  if grep -A2 'data-live-week' src/components/board/leaderboard.tsx | grep -q "this week"; then
-    fail "closed empty live-pointer must not point at this week's live wall"
-  fi
-  if grep -nE 'data-closed-live-pointer|data-live-pointer-hop|data-rolling-pointer|data-live-week-hop' \
-    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "closed empty live-pointer must not add a second named hop"
-  fi
-  grep -q 'Week {periodId} is read-only week history' src/components/board/board.tsx \
-    || fail "closed empty history fact must name the closed weekId as read-only week history — not this week's wall"
-  grep -q 'closed empty history fact is closed weekId' tests/rank.test.ts \
-    || fail "rank tests must cover closed empty history fact as closed weekId"
-  grep -q 'Week 2026-W33 is read-only week history' tests/period.test.ts \
-    || fail "period tests must name closed empty as read-only week history"
-  closed_empty_fact="$(awk '/: laneEmpty \? \(/,/) : \(/' src/components/board/board.tsx)"
-  echo "$closed_empty_fact" | grep -q 'Week {periodId} is read-only week history' \
-    || fail "closed empty history fact arm must name the closed weekId"
-  if echo "$closed_empty_fact" | grep -q "This week"; then
-    fail "closed empty history fact must not title the bay This week's remote wall"
-  fi
-  if grep -nE 'data-closed-empty-fact|data-history-fact-hop|data-closed-weekid-hop|data-empty-history-hop' \
-    src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
-    fail "closed empty history fact must not add a second named hop"
-  fi
-  if grep -q "This week&apos;s remote (global) {laneLabel(lane)} wall" src/components/board/board.tsx; then
-    fail "closed occupied history fact must not title the bay This week's remote wall"
-  fi
-  week_history_hits="$(grep -c 'Week {periodId} is read-only week history' src/components/board/board.tsx || true)"
-  [[ "$week_history_hits" -ge 2 ]] \
-    || fail "closed occupied history fact must name the closed weekId as read-only week history — not this week's wall"
-  grep -q 'closed occupied history fact is closed weekId' tests/rank.test.ts \
-    || fail "rank tests must cover closed occupied history fact as closed weekId"
-  [[ "$(grep -c 'Week 2026-W33 is read-only week history' tests/period.test.ts)" -ge 2 ]] \
-    || fail "period tests must name closed occupied as read-only week history"
-  closed_occupied_fact="$(awk '/^                \) : \($/,/^                \)}/' src/components/board/board.tsx)"
-  echo "$closed_occupied_fact" | grep -q 'Week {periodId} is read-only week history' \
-    || fail "closed occupied history fact arm must name the closed weekId"
-  if echo "$closed_occupied_fact" | grep -q "This week"; then
-    fail "closed occupied history fact must not title the bay This week's remote wall"
-  fi
-  if grep -nE 'data-closed-occupied-fact|data-occupied-history-hop|data-closed-occupied-weekid-hop|data-occupied-history-fact-hop' \
-    src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
-    fail "closed occupied history fact must not add a second named hop"
-  fi
-  grep -q 'Closed week history #1' src/components/board/leaderboard.tsx \
-    || fail "closed occupied prize pack must name closed week history — not This week's #1"
-  grep -q 'Later ranks in closed week history' src/components/board/leaderboard.tsx \
-    || fail "closed occupied later pack must name closed week history — not Later ranks this week"
-  grep -q 'closed occupied prize/later labels are closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed occupied prize/later labels as closed week history"
-  grep -q 'Closed week history #1' tests/period.test.ts \
-    || fail "period tests must name closed occupied prize labels as closed week history"
-  grep -q 'Later ranks in closed week history' tests/period.test.ts \
-    || fail "period tests must name closed occupied later labels as closed week history"
-  if grep -nE "This week's #1" src/components/board/leaderboard.tsx >/dev/null; then
-    fail "closed occupied prize pack must not label This week's #1"
-  fi
-  if grep -nE 'Later ranks this week' src/components/board/leaderboard.tsx >/dev/null; then
-    fail "closed occupied later pack must not label Later ranks this week"
-  fi
-  if grep -nE 'data-closed-occupied-labels|data-history-label-hop|data-closed-prize-hop|data-occupied-history-label' \
-    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "closed occupied prize/later labels must not add a second named hop"
-  fi
-  grep -qF 'Closed week history ${periodId} — read only.' src/components/board/board.tsx \
-    || fail "closed occupied period stamp must name closed week history — not a live Next reset clock"
-  if grep -qF 'Period ${periodId}. Next reset ${nextResetAt}. Closed week — read only.' src/components/board/board.tsx; then
-    fail "closed empty period stamp must not print a live Next reset clock"
-  fi
-  grep -qF 'Rolling last 7 days from paid placement. Week ${periodId} is an audit label. Next reset ${nextResetAt}.' src/components/board/board.tsx \
-    || fail "occupied week-window stamp must keep Next reset on the live rolling window"
-  grep -q 'closed occupied period stamp is closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed occupied period stamp as closed week history"
-  grep -q 'closed empty period stamp is closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed empty period stamp as closed week history"
-  grep -qF 'Closed week history 2026-W33 — read only' tests/period.test.ts \
-    || fail "period tests must name closed occupied period stamp as closed week history"
-  [[ "$(grep -cF 'Closed week history 2026-W33 — read only' tests/period.test.ts)" -ge 2 ]] \
-    || fail "period tests must name closed empty period stamp as closed week history"
-  if grep -qF 'Period 2026-W33\. Next reset 2026-08-24T00:00:00\.000Z' tests/period.test.ts; then
-    fail "period tests must not keep closed empty period stamp as a live Next reset clock"
-  fi
-  closed_occupied_period="$(grep -F 'Closed week history ${periodId}' src/components/board/board.tsx || true)"
-  echo "$closed_occupied_period" | grep -qF 'Closed week history ${periodId} — read only.' \
-    || fail "closed occupied period stamp arm must name closed week history"
-  if echo "$closed_occupied_period" | grep -q "Next reset"; then
-    fail "closed occupied period stamp must not print a live Next reset clock"
-  fi
-  if grep -nE 'data-closed-occupied-period|data-history-period-hop|data-closed-period-hop|data-occupied-period-stamp' \
-    src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
-    fail "closed occupied period stamp must not add a second named hop"
-  fi
-  closed_empty_period="$(awk '/: emptyFirst/,/Closed week history/' src/components/board/board.tsx)"
-  echo "$closed_empty_period" | grep -qF 'Closed week history ${periodId} — read only.' \
-    || fail "closed empty period stamp arm must name closed week history"
-  if echo "$closed_empty_period" | grep -q "Next reset"; then
-    fail "closed empty period stamp must not print a live Next reset clock"
-  fi
-  if grep -nE 'data-closed-empty-period|data-empty-period-hop|data-closed-empty-period-hop|data-empty-period-stamp' \
-    src/components/board/board.tsx src/components/board/leaderboard.tsx src/app/globals.css >/dev/null; then
-    fail "closed empty period stamp must not add a second named hop"
-  fi
-  grep -qF '<p className="empty-lane-kicker">Closed week history</p>' src/components/board/leaderboard.tsx \
-    || fail "closed empty kicker must name closed week history — not a generic Closed week"
-  if grep -qF '<p className="empty-lane-kicker">Closed week</p>' src/components/board/leaderboard.tsx; then
-    fail "closed empty kicker must not stay a generic Closed week"
-  fi
-  grep -q 'closed empty kicker is closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed empty kicker as closed week history"
-  grep -qF 'class="empty-lane-kicker">Closed week history' tests/period.test.ts \
-    || fail "period tests must name the closed empty kicker as closed week history"
-  if grep -nE 'data-closed-empty-kicker|data-empty-kicker-hop|data-closed-kicker-hop|data-empty-history-kicker' \
-    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "closed empty kicker must not add a second named hop"
-  fi
-  grep -q 'No listings in closed week history' src/components/board/leaderboard.tsx \
-    || fail "closed empty body must name closed week history — not a generic empty lane"
-  grep -q 'Closed week history was empty' src/components/board/leaderboard.tsx \
-    || fail "closed empty body must say closed week history was empty — not This lane was empty"
-  if grep -q 'This lane was empty' src/components/board/leaderboard.tsx; then
-    fail "closed empty body must not stay This lane was empty"
-  fi
-  grep -q 'closed empty body is closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed empty body as closed week history"
-  grep -q 'No listings in closed week history' tests/period.test.ts \
-    || fail "period tests must name the closed empty body as closed week history"
-  closed_empty_body="$(awk '/if \(closed\) \{/,/Bids are closed/' src/components/board/leaderboard.tsx)"
-  echo "$closed_empty_body" | grep -q 'No listings in closed week history' \
-    || fail "closed empty body arm must name closed week history"
-  echo "$closed_empty_body" | grep -q 'Closed week history was empty' \
-    || fail "closed empty body arm must say closed week history was empty"
-  if echo "$closed_empty_body" | grep -q 'This lane was empty'; then
-    fail "closed empty body must not stay This lane was empty"
-  fi
-  if echo "$closed_empty_body" | grep -q 'No listings this period'; then
-    fail "closed empty body must not stay No listings this period"
-  fi
-  if grep -nE 'data-closed-empty-body|data-empty-body-hop|data-closed-body-hop|data-empty-history-body' \
-    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "closed empty body must not add a second named hop"
-  fi
-  grep -q 'Bids are closed in closed week history' src/components/board/leaderboard.tsx \
-    || fail "closed empty bids-closed line must name closed week history — not a generic closed lane"
-  if grep -qF 'Bids are closed.{" "}' src/components/board/leaderboard.tsx; then
-    fail "closed empty bids-closed line must not stay a generic Bids are closed"
-  fi
-  grep -q 'closed empty bids-closed line is closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed empty bids-closed line as closed week history"
-  grep -q 'Bids are closed in closed week history' tests/period.test.ts \
-    || fail "period tests must name the closed empty bids-closed line as closed week history"
-  closed_empty_bids="$(awk '/Bids are closed/,/data-live-week/' src/components/board/leaderboard.tsx)"
-  echo "$closed_empty_bids" | grep -q 'Bids are closed in closed week history' \
-    || fail "closed empty bids-closed line arm must name closed week history"
-  if echo "$closed_empty_bids" | grep -qF 'Bids are closed.{" "}'; then
-    fail "closed empty bids-closed line must not stay a generic Bids are closed"
-  fi
-  if grep -nE 'data-closed-empty-bids|data-bids-closed-hop|data-closed-bids-hop|data-empty-history-bids' \
-    src/components/board/leaderboard.tsx src/components/board/board.tsx src/app/globals.css >/dev/null; then
-    fail "closed empty bids-closed line must not add a second named hop"
-  fi
-  grep -q 'closedEmpty || closedOccupied ? "Closed week history" : "Function lanes"' src/components/board/board.tsx \
-    || fail "closed empty function-rail must name closed week history — not generic Function lanes"
-  if grep -q 'className="wall-rail-kicker">Function lanes' src/components/board/board.tsx; then
-    fail "closed empty function-rail must not stay generic Function lanes"
-  fi
-  grep -q 'closed empty function-rail is closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed empty function-rail as closed week history"
-  grep -q 'class="wall-rail-kicker">Closed week history' tests/period.test.ts \
-    || fail "period tests must name the closed empty function-rail as closed week history"
-  grep -q 'aria-label="Closed week history"' tests/period.test.ts \
-    || fail "period tests must name the closed empty function-rail aria as closed week history"
-  closed_empty_rail="$(awk '/functionRailName/,/LaneTabs/' src/components/board/board.tsx)"
-  echo "$closed_empty_rail" | grep -q 'Closed week history' \
-    || fail "closed empty function-rail arm must name closed week history"
-  if echo "$closed_empty_rail" | grep -q 'className="wall-rail-kicker">Function lanes'; then
-    fail "closed empty function-rail must not stay generic Function lanes"
-  fi
-  if grep -nE 'data-closed-empty-rail|data-function-rail-hop|data-closed-rail-hop|data-empty-history-rail' \
-    src/components/board/board.tsx src/components/board/lane-tabs.tsx src/app/globals.css >/dev/null; then
-    fail "closed empty function-rail must not add a second named hop"
-  fi
-  grep -q 'closedEmpty || closedOccupied ? "Closed week history" : "Function lanes"' src/components/board/board.tsx \
-    || fail "closed occupied function-rail must name closed week history — not generic Function lanes"
-  grep -q 'const closedOccupied = !live && !laneEmpty' src/components/board/board.tsx \
-    || fail "closed occupied function-rail must have a closed occupied arm"
-  grep -q 'closed occupied function-rail is closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed occupied function-rail as closed week history"
-  grep -q 'closed occupied function-rail must name closed week history, not generic Function lanes' tests/period.test.ts \
-    || fail "period tests must name the closed occupied function-rail as closed week history"
-  closed_occupied_rail="$(awk '/functionRailName/,/LaneTabs/' src/components/board/board.tsx)"
-  echo "$closed_occupied_rail" | grep -q 'closedOccupied' \
-    || fail "closed occupied function-rail arm must name closed occupied"
-  echo "$closed_occupied_rail" | grep -q 'Closed week history' \
-    || fail "closed occupied function-rail arm must name closed week history"
-  if echo "$closed_occupied_rail" | grep -q 'className="wall-rail-kicker">Function lanes'; then
-    fail "closed occupied function-rail must not stay generic Function lanes"
-  fi
-  if grep -nE 'data-closed-occupied-rail|data-occupied-function-rail-hop|data-closed-occupied-rail-hop|data-occupied-history-rail' \
-    src/components/board/board.tsx src/components/board/lane-tabs.tsx src/app/globals.css >/dev/null; then
-    fail "closed occupied function-rail must not add a second named hop"
-  fi
-  grep -Fq 'weekHistory={closedOccupied || closedEmpty}' src/components/board/board.tsx \
-    || fail "closed occupied function plates must be week history — not live Function lanes"
-  grep -q 'weekHistory ? `${name} week history` : name' src/components/board/lane-tabs.tsx \
-    || fail "closed occupied function plates must read as week history — not live Function names"
-  grep -q 'closed occupied function plates are closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed occupied function plates as closed week history"
-  grep -q 'closed occupied function plates must name closed week history, not live Function lanes' tests/period.test.ts \
-    || fail "period tests must name the closed occupied function plates as closed week history"
-  grep -q 'Backend week history' tests/period.test.ts \
-    || fail "period tests must show closed occupied plates as week history"
-  grep -q 'week history' src/components/board/lane-tabs.tsx \
-    || fail "closed occupied function plates arm must name week history"
-  grep -Fq 'weekHistory={closedOccupied || closedEmpty}' src/components/board/board.tsx \
-    || fail "closed empty function plates must be week history — not live Function lanes"
-  grep -q 'closed empty function plates are closed week history' tests/rank.test.ts \
-    || fail "rank tests must cover closed empty function plates as closed week history"
-  grep -q 'closed empty function plates must name closed week history, not live Function lanes' tests/period.test.ts \
-    || fail "period tests must name the closed empty function plates as closed week history"
-  [[ "$(grep -c 'Backend week history' tests/period.test.ts)" -ge 2 ]] \
-    || fail "period tests must show closed empty plates as week history"
-  if grep -Fq 'weekHistory={closedEmpty}' src/components/board/board.tsx; then
-    fail "closed empty function plates must not restamp closed occupied plates from #66"
-  fi
-  if grep -nE 'data-closed-occupied-plates|data-occupied-function-plates-hop|data-closed-occupied-plates-hop|data-occupied-history-plates' \
-    src/components/board/board.tsx src/components/board/lane-tabs.tsx src/app/globals.css >/dev/null; then
-    fail "closed occupied function plates must not add a second named hop"
-  fi
-  if grep -nE 'data-closed-empty-plates|data-empty-function-plates-hop|data-closed-empty-plates-hop|data-empty-history-plates' \
-    src/components/board/board.tsx src/components/board/lane-tabs.tsx src/app/globals.css >/dev/null; then
-    fail "closed empty function plates must not add a second named hop"
-  fi
-  grep -q '/out/' tests/period.test.ts \
-    || fail "period tests must cover GET /out/:id"
-  grep -q '302' tests/period.test.ts \
-    || fail "period tests must assert the 302 hop"
+    || fail "cards must show public clicks"
+  grep -q 'salary_invalid' src/lib/listing.ts \
+    && grep -q 'optional salary requires both annual USD bounds' tests/checkout.test.ts \
+    || fail "salary fields must preserve the optional truthful contract"
 
-  echo "== live-smoke stays operator-only =="
-  [[ -f scripts/live-smoke.sh ]] || fail "missing scripts/live-smoke.sh"
-  [[ -x scripts/live-smoke.sh ]] || fail "scripts/live-smoke.sh must be executable"
-  [[ -f docs/live-smoke.md ]] || fail "missing docs/live-smoke.md"
-  [[ -s docs/live-smoke.md ]] || fail "empty docs/live-smoke.md"
-  if grep -Eq '^\s*(bash )?(\./)?scripts/live-smoke\.sh' scripts/test.sh; then
-    fail "test.sh must not invoke live-smoke.sh"
+  echo "== about, rules, URL, period, and click contracts =="
+  for f in src/app/about/page.tsx src/app/rules/page.tsx tests/pages.test.ts \
+    src/lib/urls.ts tests/urls.test.ts src/app/out/\[id\]/route.ts tests/period.test.ts; do
+    [[ -f "$f" ]] || fail "missing $f"
+    [[ -s "$f" ]] || fail "empty $f"
+  done
+  grep -q 'href="/about"' src/app/layout.tsx || fail "nav must link to /about"
+  grep -q 'href="/rules"' src/app/layout.tsx || fail "nav must link to /rules"
+  for f in README.md SPEC.md BUILD.md docs/live-smoke.md; do
+    grep -qi 'rolling last 7 days from paid placement' "$f" \
+      || fail "$f must describe rolling paid-placement rank"
+    grep -qi 'ISO weekId is audit-only' "$f" \
+      || fail "$f must describe weekId as audit-only"
+    grep -qi 'Monday 00:00 UTC does not drop live rank' "$f" \
+      || fail "$f must state Monday does not drop live rank"
+  done
+  grep -qi 'rolling seven-day placement window' src/app/layout.tsx \
+    || fail "public metadata must describe the seven-day placement window"
+  for phrase in 'Remote Job Board' 'Rank is the bid' 'payment is confirmed' 'English' 'USD'; do
+    grep -q "$phrase" src/app/about/page.tsx || fail "about is missing $phrase"
+  done
+  for phrase in 'starts at' '$50,000' 'Monday midnight' 'seven days' \
+    'estimated or placeholder salary' 'difference between' 'chat invitations' 'adult content'; do
+    grep -q "$phrase" src/app/rules/page.tsx || fail "rules are missing $phrase"
+  done
+  if grep -nEi 'outbid\.lol|clone of|\bv1\b|fixture|no API keys|weekId|createdAt|paidAt|Waffo|BLOCKED-(SECRET|CONFIG)' \
+    src/app/about/page.tsx src/app/rules/page.tsx src/app/layout.tsx \
+    src/app/checkout/complete/page.tsx src/components/board/bid-form.tsx >/dev/null; then
+    fail "public copy must not expose development, test, clone, provider, or storage details"
   fi
-  if grep -E '^[[:space:]]*(export[[:space:]]+)?POLAR_LIVE=1' scripts/test.sh >/dev/null; then
-    fail "test.sh must not set POLAR_LIVE=1"
+  if grep -nEi 'weekly[[:space:]-]+reset|rolling[[:space:]-]+reset' \
+    src/app/rules/page.tsx tests/pages.test.ts scripts/live-smoke.sh docs/live-smoke.md >/dev/null; then
+    fail "Rules and fixture smoke must not make an obsolete cadence claim"
   fi
-  grep -q 'BLOCKED-SECRET: POLAR_ACCESS_TOKEN' scripts/live-smoke.sh \
-    || fail "live-smoke.sh must name BLOCKED-SECRET: POLAR_ACCESS_TOKEN"
-  grep -q 'POLAR_LIVE' scripts/live-smoke.sh \
-    || fail "live-smoke.sh must gate live Polar on POLAR_LIVE"
+  grep -q 'invalid_lane' tests/checkout.test.ts \
+    || fail "checkout tests must cover invalid lane rejection"
+  grep -q 'export async function GET' src/app/healthz/route.ts \
+    || fail "health route GET missing"
+  grep -q 'status: 503' src/app/healthz/route.ts \
+    || fail "health route must fail closed"
+  grep -q 'export function canonicalizeApplyUrl' src/lib/urls.ts || fail "URL canonicalizer missing"
+  grep -q 'export function outboundApplyUrl' src/lib/urls.ts || fail "outbound URL helper missing"
+  for code in invalid_url tracking_stripped_empty chat_link_forbidden nsfw_forbidden shortener_unresolved; do
+    grep -q "$code" src/lib/urls.ts || fail "URL helper must emit $code"
+    grep -q "$code" tests/urls.test.ts || fail "URL tests must cover $code"
+  done
+  grep -q 'utm_' tests/urls.test.ts || fail "URL tests must strip tracking query"
+  grep -q 'SHORTENER_FIXTURES\|resolveShortener' tests/urls.test.ts \
+    || fail "URL tests must use offline shortener fixtures"
+  grep -q 'resolveListingIdentity' src/app/checkout/route.ts \
+    || fail "checkout must resolve known live shorteners before drafting"
+  grep -q 'SHORTENER_HOP_TIMEOUT_MS' src/lib/urls.ts \
+    || fail "shortener resolution must have a bounded hop timeout"
+  if grep -nE '[^a-zA-Z_]fetch\(' src/lib/urls.ts >/dev/null; then
+    fail "URL helper must not call global fetch"
+  fi
+  for phrase in 'export function isoWeekPeriodId' 'export function currentPeriodMeta' \
+    'export function resolveBoardPeriod' 'ROLLING_WEEK_MS' 'export function isInRollingWeek' \
+    'export function liveRankResetAt' 'export function placementExpiresAt'; do
+    grep -q "$phrase" src/lib/period.ts || fail "period helper is missing $phrase"
+  done
+  grep -q 'Monday' src/lib/period.ts || fail "period helper must document Monday UTC"
+  grep -q '7 \* DAY_MS' src/lib/period.ts || fail "period window must be seven days"
+  if grep -nE 'ROLLING_WINDOW_MS = 24|24 \* 60 \* 60 \* 1000' \
+    src/lib/period.ts src/lib/board.ts src/lib/store.ts >/dev/null; then
+    fail "live rank must not be a 24-hour lock"
+  fi
+  grep -q 'listPaidRolling' src/lib/store.ts || fail "store must query rolling paid rows"
+  grep -q 'findLiveByIdentity' src/lib/store.ts || fail "store must raise against live identity"
+  grep -q 'listPaidRolling' src/lib/board.ts || fail "board must query rolling paid rows"
+  grep -q 'export async function GET' src/app/out/\[id\]/route.ts || fail "click route GET missing"
+  grep -q 'NextResponse.redirect' src/app/out/\[id\]/route.ts || fail "click route must redirect"
+  grep -q 'incrementClicks' src/app/out/\[id\]/route.ts || fail "click route must count clicks"
+  grep -q 'outboundApplyUrl' src/app/out/\[id\]/route.ts || fail "click route must canonicalize URL"
+  grep -q 'resolveBoardPeriod' src/app/page.tsx || fail "page must resolve period"
+  grep -q 'params.period' src/app/page.tsx || fail "page must accept period"
+  grep -q 'getLiveBoardListings' src/app/page.tsx || fail "page must load live rolling rows"
+  grep -q 'liveRankResetAt' src/app/page.tsx || fail "page must reset from paid placement"
+  grep -q 'data-week-window={occupiedLive ? "rolling-7d"' src/components/board/board.tsx \
+    || fail "occupied wall must stamp rolling window"
+  grep -q 'data-empty-window' src/components/board/board.tsx \
+    || fail "empty wall must stamp its rolling window"
+  grep -q 'Rolling last 7 days from paid placement' src/components/board/board.tsx \
+    || fail "wall must state rolling placement window"
+  grep -q 'The last 7 days from paid placement are empty' src/components/board/bid-form.tsx \
+    || fail "empty form must state rolling placement window"
+  grep -q 'Rolling last 7 days #1' src/components/board/leaderboard.tsx \
+    || fail "prize pack must state rolling window"
+  grep -q 'Later ranks in the rolling last 7 days' src/components/board/leaderboard.tsx \
+    || fail "later pack must state rolling window"
+  grep -q 'Week {periodId} is read-only week history' src/components/board/board.tsx \
+    || fail "closed board must identify its week history"
+  grep -q 'Closed week history #1' src/components/board/leaderboard.tsx \
+    || fail "closed prize pack must be read-only"
+  grep -q 'Later ranks in closed week history' src/components/board/leaderboard.tsx \
+    || fail "closed later pack must be read-only"
+  grep -q 'No listings in closed week history' src/components/board/leaderboard.tsx \
+    || fail "closed empty board must be honest"
+  grep -q 'Bids are closed in closed week history' src/components/board/leaderboard.tsx \
+    || fail "closed empty board must say bids are closed"
+  grep -q 'weekHistory={closedOccupied || closedEmpty}' src/components/board/board.tsx \
+    || fail "closed function plates must be marked as history"
+  grep -q 'weekHistory ? `${name} week history` : name' src/components/board/lane-tabs.tsx \
+    || fail "closed function plates must name history"
+  grep -q 'GET /out/:id increments clicks' tests/period.test.ts \
+    || fail "period tests must cover click/redirect behavior"
+  grep -q 'malformed click-cookie encoding' tests/period.test.ts \
+    || fail "period tests must cover malformed click-cookie recovery"
+  grep -q '302s without query' tests/period.test.ts || fail "click tests must assert clean 302"
+  grep -q 'paid placement stays live across Monday' tests/period.test.ts \
+    || fail "period tests must cover rolling placement"
+  grep -q 'ISO week labels follow Monday UTC' tests/period.test.ts \
+    || fail "period tests must cover frozen/Monday labels"
+  grep -q 'closed occupied weeks keep paid cards' tests/period.test.ts \
+    || fail "period tests must cover closed occupied history"
+  grep -q 'closed-week unpaid rows stay off the wall' tests/period.test.ts \
+    || fail "period tests must cover closed unpaid rows"
+
+  echo "== operator smoke remains offline and explicit =="
+  [[ -f scripts/live-smoke.sh && -x scripts/live-smoke.sh ]] \
+    || fail "live-smoke.sh must be present and executable"
+  [[ -f docs/live-smoke.md && -s docs/live-smoke.md ]] \
+    || fail "live smoke documentation is missing"
+  grep -q 'WAFFO_MODE=fixture' scripts/live-smoke.sh \
+    || fail "live smoke must use explicit fixture mode"
   grep -q 'live-smoke refuses CI=true' scripts/live-smoke.sh \
-    || fail "live-smoke.sh must refuse CI=true"
-  grep -q 'PASS-ERROR' docs/live-smoke.md || fail "docs/live-smoke.md missing PASS-ERROR"
-  grep -q 'BLOCKED-SECRET' docs/live-smoke.md || fail "docs/live-smoke.md missing BLOCKED-SECRET"
+    || fail "live smoke must refuse CI"
+  grep -q 'LIVE_SMOKE_BASE is unsupported' scripts/live-smoke.sh \
+    || fail "live smoke must not attach to an arbitrary server"
+  for name in POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_PRODUCT_ID \
+    POLAR_API_BASE POLAR_SUCCESS_URL POLAR_FIXTURE_ONLY; do
+    grep -q "$name" scripts/live-smoke.sh \
+      || fail "live smoke must clear retired $name"
+    grep -q "$name" scripts/test.sh \
+      || fail "release gate must clear retired $name"
+  done
+  grep -q 'PASS-ERROR' docs/live-smoke.md || fail "smoke docs missing PASS-ERROR"
+  grep -q 'BLOCKED-SECRET' docs/live-smoke.md || fail "smoke docs missing BLOCKED-SECRET"
   for n in 1 2 3 4 5 6 7 8 9 10 11 12 13; do
-    grep -q "| ${n} |" docs/live-smoke.md \
-      || fail "docs/live-smoke.md missing SPEC §10 row $n"
+    grep -q "| ${n} |" docs/live-smoke.md || fail "smoke docs missing SPEC §10 row $n"
   done
 
-  echo "== install =="
+  echo "== install and offline release gates =="
   if [[ ! -d node_modules ]]; then
-    if [[ -f package-lock.json ]]; then
-      npm ci
-    else
-      npm install
-    fi
+    if [[ -f package-lock.json ]]; then npm ci; else npm install; fi
   fi
+  unset WAFFO_MODE WAFFO_MERCHANT_ID WAFFO_PRIVATE_KEY WAFFO_PRIVATE_KEY_FILE
+  unset WAFFO_STORE_ID WAFFO_PRODUCT_ID WAFFO_PUBLIC_BASE_URL WAFFO_API_BASE
+  unset WAFFO_WEBHOOK_PUBLIC_KEY WAFFO_WEBHOOK_TEST_PUBLIC_KEY WAFFO_WEBHOOK_PROD_PUBLIC_KEY
+  unset DATABASE_PATH WAFFO_LIVE
+  unset POLAR_LIVE POLAR_ACCESS_TOKEN POLAR_WEBHOOK_SECRET POLAR_PRODUCT_ID
+  unset POLAR_API_BASE POLAR_SUCCESS_URL POLAR_FIXTURE_ONLY
+  export WAFFO_MODE=fixture
+  [[ "${WAFFO_MODE:-}" == "fixture" ]] || fail "test gate must select fixture mode"
+  [[ "${WAFFO_LIVE:-}" != "1" ]] || fail "test gate must not select live Waffo"
 
-  unset POLAR_LIVE
-  unset POLAR_ACCESS_TOKEN
-  unset POLAR_WEBHOOK_SECRET
-  export POLAR_FIXTURE_ONLY=1
-  [[ "${POLAR_LIVE:-}" != "1" ]] || fail "POLAR_LIVE must stay unset in test.sh"
-
-  echo "== tsc --noEmit =="
-  npx tsc --noEmit
-
+  echo "== typecheck =="
+  npm run typecheck
   echo "== unit tests =="
   if [[ -d tests ]] && find tests -name '*.test.ts' | grep -q .; then
-    # Quoted so bash 3.2 does not eat **; Node 22's test runner expands the glob.
     npx tsx --tsconfig tsconfig.test.json --test 'tests/**/*.test.ts'
   else
     echo "skip: no tests/**/*.test.ts yet"
   fi
+  echo "== next build =="
+  npm run build
+  echo "== built runtime happy-path smoke =="
+  bash scripts/probe-built-runtime.sh
+  echo "== production startup fail-closed probe =="
+  bash scripts/probe-production-start.sh
+  echo "== production dependency audit =="
+  npm audit --omit=dev
 fi
 
 echo "OK: buildable and testable"

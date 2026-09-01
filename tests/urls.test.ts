@@ -173,36 +173,82 @@ test("resolved shortener that lands on chat or NSFW is still rejected", () => {
 
 test("live shortener resolve is off in fixture/CI env; injected fetch is the only hop", async () => {
   assert.equal(
-    isLiveUrlResolveEnabled({ POLAR_FIXTURE_ONLY: "1", POLAR_LIVE: "1" }),
+    isLiveUrlResolveEnabled({ WAFFO_MODE: "fixture", URL_RESOLVE_LIVE: "1" }),
     false,
   );
-  assert.equal(isLiveUrlResolveEnabled({ POLAR_LIVE: "1" }), true);
+  assert.equal(isLiveUrlResolveEnabled({ POLAR_LIVE: "1" }), false);
+  assert.equal(isLiveUrlResolveEnabled({ WAFFO_MODE: "waffo-test" }), true);
   assert.equal(isLiveUrlResolveEnabled({ URL_RESOLVE_LIVE: "1" }), true);
   assert.equal(isLiveUrlResolveEnabled({}), false);
 
   await assert.rejects(
     () =>
       resolveShortenerHop("https://bit.ly/acme-backend", {
-        env: { POLAR_FIXTURE_ONLY: "1" },
+        env: { WAFFO_MODE: "fixture" },
       }),
     (error: unknown) =>
       error instanceof UrlError && error.code === "shortener_unresolved",
   );
 
+  let calls = 0;
   const target = await resolveShortenerHop("https://bit.ly/acme-backend", {
     env: { URL_RESOLVE_LIVE: "1" },
-    fetchImpl: async () => ({
-      headers: {
-        get(name: string) {
-          return name.toLowerCase() === "location"
-            ? "https://jobs.example.com/acme?utm_source=x"
-            : null;
+    fetchImpl: async (_input, init) => {
+      calls += 1;
+      assert.equal(init.method, "HEAD");
+      assert.equal(init.redirect, "manual");
+      assert.ok(init.signal);
+      return {
+        headers: {
+          get(name: string) {
+            return name.toLowerCase() === "location"
+              ? "https://jobs.example.com/acme?utm_source=x"
+              : null;
+          },
         },
-      },
-    }),
+      };
+    },
   });
+  assert.equal(calls, 1);
   assert.equal(target, "https://jobs.example.com/acme?utm_source=x");
   assert.equal(canonicalizeApplyUrl(target), "https://jobs.example.com/acme");
+
+  let directCalls = 0;
+  assert.equal(
+    await resolveShortenerHop("https://jobs.example.com/acme", {
+      env: { WAFFO_MODE: "fixture" },
+      fetchImpl: async () => {
+        directCalls += 1;
+        return { headers: { get: () => null } };
+      },
+    }),
+    "https://jobs.example.com/acme",
+  );
+  assert.equal(directCalls, 0);
+});
+
+test("live shortener timeout and malformed locations stay unresolved", async () => {
+  await assert.rejects(
+    () =>
+      resolveShortenerHop("https://bit.ly/acme-backend", {
+        env: { WAFFO_MODE: "waffo-test" },
+        timeoutMs: 1,
+        fetchImpl: async () => new Promise<never>(() => undefined),
+      }),
+    (error: unknown) =>
+      error instanceof UrlError && error.code === "shortener_unresolved",
+  );
+  await assert.rejects(
+    () =>
+      resolveShortenerHop("https://bit.ly/acme-backend", {
+        env: { WAFFO_MODE: "waffo-test" },
+        fetchImpl: async () => ({
+          headers: { get: () => "not a valid % location" },
+        }),
+      }),
+    (error: unknown) =>
+      error instanceof UrlError && error.code === "shortener_unresolved",
+  );
 });
 
 test("outbound apply URL never adds query parameters", () => {
