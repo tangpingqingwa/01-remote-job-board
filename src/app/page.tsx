@@ -1,9 +1,11 @@
+import type { Metadata } from "next";
 import { Board } from "../components/board/board";
 import { getBoardListings, getLiveBoardListings, parseLane } from "../lib/board";
 import { liveRankResetAt, resolveBoardPeriod } from "../lib/period";
 import { rankListings } from "../lib/rank";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 type HomePageProps = {
   searchParams?: Promise<{

@@ -4,6 +4,7 @@ export const metadata: Metadata = {
   title: "About · Remote Job Board",
   description:
     "A public rolling seven-day board for remote jobs, ranked only by bid.",
+  alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {

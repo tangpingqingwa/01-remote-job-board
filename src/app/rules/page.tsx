@@ -4,6 +4,7 @@ export const metadata: Metadata = {
   title: "Rules · Remote Job Board",
   description:
     "Rank is the bid. Minimum $5, maximum $50,000, with a rolling seven-day placement window.",
+  alternates: { canonical: "/rules" },
 };
 
 export default function RulesPage() {
