@@ -2693,11 +2693,16 @@ input:focus-visible {
   .claim h2,
   .claim[data-list-role] h2,
   .claim[data-empty-honest] h2[data-empty-claim] {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     justify-content: center;
     gap: 6px;
     font-size: 1.25rem;
     white-space: nowrap;
+  }
+
+  .claim h2 > span:first-child,
+  .claim h2 .amount-stepper {
+    flex: 0 0 auto;
   }
 
   .amount-stepper {

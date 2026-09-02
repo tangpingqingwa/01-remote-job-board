@@ -196,12 +196,12 @@ There is no API-key product and no revenue share with the hiring company. Waffo�
 
 | Path | Purpose |
 |---|---|
-| `/` | Board. Lane tabs. One apply-URL (or handle) field, amount field, **Outbid** button. Ranked cards: rank, title, company, **$bid**, public **clicks**. |
+| `/` | Board. Lane tabs. One apply-URL (or handle) field, amount field, **Claim rank** button. Ranked cards: rank, title, company, **$bid**, public **clicks**. |
 | `/about` | What this is: no ads, no API keys, no revenue share. Rank is the bid. Global remote, English, USD. |
 | `/rules` | Normative ranking, min/max, raise-the-difference, rolling placement window and ISO audit weekId, URL rules, no chat/NSFW, no invented salaries. |
 | `/return` | Checkout return. Success → “you’re on the board” + link home. Cancel → no rank claimed. |
 
-Board chrome clones outbid.lol: one input row, amount, Outbid, then a stacked leaderboard of cards. No extra marketing widgets on `/`.
+Board chrome follows the observed outbid.lol auction shape: one input row, amount, Claim rank, then a stacked leaderboard of cards. No extra marketing widgets on `/`.
 
 ---
 
@@ -240,7 +240,7 @@ Operator-only. `scripts/live-smoke.sh` is **not** called from `scripts/test.sh` 
 
 | # | Flow | Expected |
 |---|---|---|
-| 1 | `GET /` | 200, lane tabs, Outbid control, no invented listings |
+| 1 | `GET /` | 200, lane tabs, Claim rank control, no invented listings |
 | 2 | `GET /about` and `GET /rules` | 200, state min $5, rolling placement window, ISO audit weekId, rank = bid |
 | 3 | New listing, valid remote job, bid $5 | Fixture checkout in the offline smoke; authorized Waffo Checkout session or `BLOCKED-CONFIG` in a deployment smoke |
 | 4 | Fixture or completed live return | listing visible at the rank that $5 takes |

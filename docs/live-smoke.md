@@ -56,7 +56,7 @@ result table here.
 
 | # | Flow | Expected offline result |
 |---|---|---|
-| 1 | `GET /` | 200. Lane tabs + Outbid. Empty lane is honest; no invented listings. |
+| 1 | `GET /` | 200. Lane tabs + Claim rank. Empty lane is honest; no invented listings. |
 | 2 | `GET /about` and `GET /rules` | 200. Min $5; rolling last 7 days from paid placement; ISO weekId is audit-only; Monday 00:00 UTC does not drop live rank; rank = bid. |
 | 3 | New listing, valid remote job, bid $5 | Explicit fixture checkout; no provider request. |
 | 4 | Fixture or completed live return | Fixture return lists at the rank that $5 takes. |

@@ -266,6 +266,22 @@ test("Claim rank amount controls stay centered and inline without legacy copy", 
   assert.match(cssSource, /\.amount-field input\s*\{[^}]*width:\s*auto;[^}]*min-width:\s*2ch;[^}]*max-width:\s*6ch;/);
 });
 
+test("narrow mobile claim heading wraps centered units without splitting the stepper", () => {
+  const mobileCss = cssSource.slice(cssSource.lastIndexOf("@media (max-width: 46rem)"));
+  assert.match(
+    mobileCss,
+    /\.claim h2,\s*\.claim\[data-list-role\] h2,[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*center;/,
+  );
+  assert.match(
+    mobileCss,
+    /\.claim h2 > span:first-child,\s*\.claim h2 \.amount-stepper\s*\{[^}]*flex:\s*0 0 auto;/,
+  );
+  assert.match(
+    cssSource,
+    /\.amount-stepper\s*\{[^}]*flex:\s*0 0 auto;[^}]*align-items:\s*center;[^}]*gap:\s*8px;[^}]*white-space:\s*nowrap;/,
+  );
+});
+
 test("function rail exposes all eight job lanes", () => {
   const html = renderBoard();
   assert.match(html, /data-lane-count="8"/);

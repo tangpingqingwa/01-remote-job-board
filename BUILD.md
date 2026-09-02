@@ -14,7 +14,7 @@ This document locks the stack and the PR sequence. Do not implement the app in t
 | Layer | Choice |
 |---|---|
 | App | **Next.js** (App Router) + TypeScript + Node 22 |
-| UI | Server Components + small client islands for the bid form. Clone outbid.lol: one URL/handle field, amount, **Outbid** button, ranked cards with **$bid** and **clicks** |
+| UI | Server Components + small client islands for the bid form. Follow the outbid.lol auction shape: one URL/handle field, amount, **Claim rank** button, ranked cards with **$bid** and **clicks** |
 | DB | **SQLite** via `better-sqlite3` (one file). Tests use a temp file. No Postgres in v1 — keep CI offline and one-box |
 | Rank | Pure function `rankListings(listings): RankedListing[]` — `bidUsd` desc, then `createdAt` asc |
 | Period | Live rank = rolling last 7 days from paid placement. `periodId` is an ISO-week audit label (`YYYY-Www`). Inject `now` in tests |
@@ -107,13 +107,13 @@ Each heading below is exactly `### PR N: title` on its own line so the fleet par
 - **Acceptance:** `bash scripts/test.sh` green with no Waffo secrets or provider calls. Job `ci` still the only required check. No live Waffo. No real board logic required beyond a compiling app.
 
 ### PR 2: Board UI clone of outbid.lol
-- **Description:** Public board: lane tabs, one input (apply URL or company handle), amount, **Outbid** button, ranked cards showing **$** bid and **clicks**. Fixture listings are enough; checkout may still be a stub that does not charge.
+- **Description:** Public board: lane tabs, one input (apply URL or company handle), amount, **Claim rank** button, ranked cards showing **$** bid and **clicks**. Fixture listings are enough; checkout may still be a stub that does not charge.
 - **Files:** `src/app/page.tsx`, board components, `src/lib/rank.ts`, `tests/rank.test.ts`
 - **Dependencies:** PR 1
 - **Acceptance:** Empty lane is honest (no invented jobs). Cards render rank, title, company, `$N`, click count. Sort matches SPEC §3 on fixture rows.
 
 ### PR 3: Waffo checkout + fixture
-- **Description:** Outbid starts a checkout for the bid amount. Explicit Waffo test/prod modes use the official Pancake SDK; tests complete payment through the explicit fixture port and signed webhook vectors. `/return` shows success or cancel. Rank updates only after paid.
+- **Description:** Claim rank starts a checkout for the bid amount. Explicit Waffo test/prod modes use the official Pancake SDK; tests complete payment through the explicit fixture port and signed webhook vectors. `/return` shows success or cancel. Rank updates only after paid.
 - **Files:** `src/payments/port.ts`, `src/payments/fixture.ts`, `src/payments/waffo.ts`, `src/payments/polar.ts`, `src/app/return/page.tsx`, `tests/checkout.test.ts`, `tests/payment-lifecycle.test.ts`
 - **Dependencies:** PR 2
 - **Acceptance:** Fixture: $5 new listing appears after fake pay. Abandoned checkout does not list. `WAFFO_MODE=fixture` is explicit, production cannot self-settle through fixture, and CI does not call Waffo.
