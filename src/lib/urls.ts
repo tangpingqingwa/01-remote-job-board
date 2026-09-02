@@ -539,6 +539,27 @@ function parseAbsoluteUrl(raw: string): URL {
   return parsed;
 }
 
+/**
+ * A documented shortener is resolved after submit, so the client can only
+ * validate its local HTTPS syntax and allowlisted host here. The server still
+ * performs the one-hop resolution and validates the final destination.
+ */
+function isSyntacticallyValidShortenerUrl(raw: string): boolean {
+  try {
+    const candidate = withHttpsScheme(raw);
+    const parsed = parseAbsoluteUrl(raw);
+    const authority = authorityParts(candidate.slice("https:".length));
+    if (!authority || authority.host.startsWith("[")) return false;
+    const trailingDots = authority.host.match(/\.+$/)?.[0].length ?? 0;
+    if (trailingDots > 1 || !plausibleDnsHostname(authority.host)) {
+      return false;
+    }
+    return isShortenerHost(hostnameOf(parsed));
+  } catch {
+    return false;
+  }
+}
+
 /** Format https URL: lowercase host, no :443, no trailing slash, no query/hash. */
 export function formatCanonicalHttps(parsed: URL): string {
   const host = hostnameOf(parsed);
@@ -614,6 +635,7 @@ export function isApplyIdentityReady(raw: string): boolean {
   const trimmed = raw.trim();
   if (!trimmed) return false;
   if (isUrlLikeApplyIdentity(trimmed)) {
+    if (isSyntacticallyValidShortenerUrl(trimmed)) return true;
     try {
       canonicalizeApplyUrl(trimmed);
       return true;

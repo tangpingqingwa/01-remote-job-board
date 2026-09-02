@@ -265,6 +265,17 @@ test("documented shortener without a fixture is 422 shortener_unresolved", () =>
   assertUrlError("https://lnkd.in/abc", "shortener_unresolved");
 });
 
+test("documented shorteners stay client-ready for server-side hop resolution", () => {
+  for (const raw of [
+    "https://bit.ly/acme-backend",
+    "https://t.co/acme",
+    "https://tinyurl.com/acme",
+  ]) {
+    assert.equal(isApplyIdentityReady(raw), true, raw);
+    assertUrlError(raw, "shortener_unresolved");
+  }
+});
+
 test("shortener fixtures resolve one hop; stored URL is the final https target", () => {
   assert.equal(
     canonicalizeApplyUrl("https://bit.ly/acme-backend", {
