@@ -162,7 +162,7 @@ test("empty lane markup is honest", () => {
   assert.doesNotMatch(html, /data-listing-card|Acme|Beta|Gamma|competitive salary/i);
 });
 
-test("empty lane form is a direct identity-and-function path before one Outbid submit", () => {
+test("empty lane form is a direct identity-and-function path before one Claim rank submit", () => {
   const html = renderBoard([]);
   const form = formMarkup(html);
   const claim = html.indexOf("Claim #1 for");
@@ -175,7 +175,7 @@ test("empty lane form is a direct identity-and-function path before one Outbid s
   const salary = html.indexOf('name="salaryMinUsd"');
   const identity = html.indexOf('name="identity"');
   const lane = html.indexOf('name="lane"');
-  const submit = html.indexOf(">Outbid<");
+  const submit = html.indexOf(">Claim rank<");
 
   assert.ok(claim >= 0 && amount > claim && minus > claim && plus > amount);
   assert.ok(honest > plus && title > honest && company > title && salary > company);
@@ -186,7 +186,8 @@ test("empty lane form is a direct identity-and-function path before one Outbid s
   assert.equal(count(form, /name="salary(?:Min|Max)Usd"/g), 2);
   assert.equal(count(form, /name="lane"/g), 1);
   assert.equal(count(form, /type="submit"/g), 1);
-  assert.equal(count(form, />Outbid</g), 1);
+  assert.equal(count(form, />Claim rank</g), 1);
+  assert.match(form, /aria-label="Claim rank"/);
   assert.match(form, /name="identity"[^>]*required|required[^>]*name="identity"/);
   assert.match(form, /name="title"[^>]*required|required[^>]*name="title"/);
   assert.match(form, /name="company"[^>]*required|required[^>]*name="company"/);
@@ -243,7 +244,7 @@ test("live and history period tabs are real synchronized views", () => {
     history,
     /href="\/\?lane=backend&amp;period=2026-W32"[^>]*role="tab"[^>]*aria-selected="true"[^>]*>History</,
   );
-  assert.doesNotMatch(history, /data-bid-form|>Outbid</);
+  assert.doesNotMatch(history, /data-bid-form|>Claim rank</);
 });
 
 test("bid amount keeps a visible keyboard focus cue", () => {
@@ -251,6 +252,18 @@ test("bid amount keeps a visible keyboard focus cue", () => {
     cssSource,
     /\.amount-field input:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--primary\);[^}]*outline-offset:\s*2px;/,
   );
+});
+
+test("Claim rank amount controls stay centered and inline without legacy copy", () => {
+  const html = renderBoard([]);
+  assert.match(html, /class="claim-submit" aria-label="Claim rank"/);
+  assert.doesNotMatch(html, /Outbid/);
+  assert.match(
+    cssSource,
+    /\.claim h2,\s*\.claim\[data-list-role\] h2,[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?justify-content:\s*center;[\s\S]*?white-space:\s*nowrap;/,
+  );
+  assert.match(cssSource, /\.amount-stepper\s*\{[^}]*display:\s*inline-flex;[^}]*gap:\s*8px;/);
+  assert.match(cssSource, /\.amount-field input\s*\{[^}]*width:\s*auto;[^}]*min-width:\s*2ch;[^}]*max-width:\s*6ch;/);
 });
 
 test("function rail exposes all eight job lanes", () => {
@@ -268,17 +281,18 @@ test("function rail exposes all eight job lanes", () => {
   assert.match(cssSource, /\.lane-tabs-primary\s*\{[^}]*display:\s*grid/);
 });
 
-test("occupied form keeps List a role, job fields, one identity, and one Outbid after the paid board", () => {
+test("occupied form keeps List a role, job fields, one identity, and one Claim rank after the paid board", () => {
   const html = renderBoard();
   const form = formMarkup(html);
   const identity = form.indexOf('name="identity"');
-  const submit = form.indexOf(">Outbid<");
+  const submit = form.indexOf(">Claim rank<");
   assert.ok(identity >= 0 && submit > identity);
   assert.equal(count(form, /name="identity"/g), 1);
   assert.equal(count(form, /name="title"/g), 1);
   assert.equal(count(form, /name="company"/g), 1);
   assert.equal(count(form, /type="submit"/g), 1);
-  assert.equal(count(form, />Outbid</g), 1);
+  assert.equal(count(form, />Claim rank</g), 1);
+  assert.match(form, /aria-label="Claim rank"/);
   assert.match(html, /data-list-role="employer"/);
   assert.match(html, /List a role/);
   assert.match(html, /Already on this lane/);
@@ -415,14 +429,14 @@ test("closed empty and occupied boards isolate live actions while preserving his
   assert.match(empty, /Closed week history/);
   assert.match(empty, /Bids are closed in closed week history/);
   assert.match(empty, /Open the live Backend wall for the rolling last 7 days/);
-  assert.doesNotMatch(empty, /data-bid-form|>Outbid<|data-empty-bay-list|data-first-click/);
+  assert.doesNotMatch(empty, /data-bid-form|>Claim rank<|data-empty-bay-list|data-first-click/);
 
   assert.match(occupied, /Closed week history 2026-W33 — read only/);
   assert.match(occupied, /data-listing-card/);
   assert.match(occupied, /job-sheet/);
   assert.match(occupied, /later-sheet/);
   assert.match(occupied, />Apply</);
-  assert.doesNotMatch(occupied, /data-bid-form|>Outbid<|data-list-role|data-first-click="apply"/);
+  assert.doesNotMatch(occupied, /data-bid-form|>Claim rank<|data-list-role|data-first-click="apply"/);
   assert.match(occupied, /data-lane="backend"[^>]*>Backend week history</);
 });
 

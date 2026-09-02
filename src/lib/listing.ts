@@ -4,6 +4,7 @@ import { MAX_BID_USD, MIN_BID_USD } from "./types";
 import type { BoardStore } from "./store";
 import {
   canonicalizeApplyUrl,
+  isUrlLikeApplyIdentity,
   resolveShortenerInput,
   type ShortenerResolveDeps,
   UrlError,
@@ -62,10 +63,6 @@ function deriveHandle(identity: string): string {
   return normalizeHandle(trimmed);
 }
 
-function looksLikeAbsoluteUrl(raw: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:/i.test(raw);
-}
-
 /** Machine SPEC §9 codes stay on CheckoutError so /checkout can redirect. */
 export function listingApplyUrl(raw: string): string {
   try {
@@ -80,7 +77,8 @@ export function listingApplyUrl(raw: string): string {
 
 /**
  * Prepare an identity for checkout creation. Only known shorteners can invoke
- * the live one-hop resolver; handles and ordinary HTTPS URLs remain offline.
+ * the live one-hop resolver; handles and ordinary URLs (including bare
+ * domains) remain offline.
  */
 export async function resolveListingIdentity(
   raw: string,
@@ -88,7 +86,7 @@ export async function resolveListingIdentity(
 ): Promise<string> {
   try {
     const candidate = await resolveShortenerInput(raw, deps);
-    return looksLikeAbsoluteUrl(candidate)
+    return isUrlLikeApplyIdentity(candidate)
       ? listingApplyUrl(candidate)
       : candidate.trim();
   } catch (error) {
@@ -102,7 +100,7 @@ export async function resolveListingIdentity(
 
 function deriveApplyUrl(identity: string): string {
   const trimmed = identity.trim();
-  if (looksLikeAbsoluteUrl(trimmed)) return listingApplyUrl(trimmed);
+  if (isUrlLikeApplyIdentity(trimmed)) return listingApplyUrl(trimmed);
   // A handle is a valid listing identity, but it is not a destination. Keep
   // the persisted URL empty until the employer supplies a real HTTPS target;
   // never turn a handle into a fabricated clickable host.
@@ -165,7 +163,7 @@ export function draftFromOutbidInput(input: {
   const identity = input.identity.trim();
   if (!identity) throw new CheckoutError("invalid_listing", 422);
 
-  const applyUrl = looksLikeAbsoluteUrl(identity)
+  const applyUrl = isUrlLikeApplyIdentity(identity)
     ? listingApplyUrl(identity)
     : undefined;
 

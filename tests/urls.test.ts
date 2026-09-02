@@ -71,6 +71,34 @@ test("SPEC §6: strip query, fragment, tracking; normalize host/port/slash", () 
   );
 });
 
+test("scheme-less domains gain an https origin before canonicalization", () => {
+  assert.equal(canonicalizeApplyUrl("hartevo.com"), "https://hartevo.com");
+  assert.equal(
+    canonicalizeApplyUrl("hartevo.com:8443/jobs"),
+    "https://hartevo.com:8443/jobs",
+  );
+  assert.equal(
+    canonicalizeApplyUrl("HARTEVO.COM/jobs/backend/?utm_source=launch#role"),
+    "https://hartevo.com/jobs/backend",
+  );
+  assert.equal(
+    canonicalizeApplyUrl("//hartevo.com/jobs/backend"),
+    "https://hartevo.com/jobs/backend",
+  );
+
+  const draft = draftFromOutbidInput({
+    identity: "hartevo.com",
+    amountUsd: 5,
+    lane: "backend",
+    periodId: PERIOD,
+    title: "Backend Engineer",
+    company: "Hartevo",
+    payerId: "pay_hartevo",
+  });
+  assert.equal(draft.applyUrl, "https://hartevo.com");
+  assert.equal(draft.companyHandle, "hartevo-com");
+});
+
 test("https required; credentials, javascript, and data schemes are invalid_url", () => {
   for (const raw of [
     "http://jobs.example.com/acme",

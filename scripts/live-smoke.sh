@@ -538,15 +538,15 @@ elif ! html_has "$board0" 'data-lane-tabs' \
   || ! html_has "$board0" 'data-lane="backend"' \
   || ! html_has "$board0" 'data-bid-form' \
   || ! html_has "$board0" 'Claim #1 for' \
-  || ! html_has "$board0" 'Outbid' \
+  || ! html_has "$board0" 'Claim rank' \
   || ! html_has "$board0" "data-period=\"${EXPECT_WEEK}\""; then
-  record "1-board" "FAIL" "GET / missing lane tabs, Claim #1 lead, Outbid control, or period ${EXPECT_WEEK}"
+  record "1-board" "FAIL" "GET / missing lane tabs, Claim #1 lead, Claim rank control, or period ${EXPECT_WEEK}"
 elif invented_listings "$board0"; then
   record "1-board" "FAIL" "GET / invented listings"
 elif [[ "$board0_count" == "0" ]] && html_has "$board0" 'data-empty-lane="true"'; then
-  record "1-board" "PASS" "GET / 200 lane tabs + Claim #1/Outbid; empty lane; no invented listings"
+  record "1-board" "PASS" "GET / 200 lane tabs + Claim #1/Claim rank; empty lane; no invented listings"
 elif [[ "$board0_count" != "0" ]]; then
-  record "1-board" "PASS" "GET / 200 lane tabs + Claim #1/Outbid; ${board0_count} already-paid card(s) (not seeded by smoke)"
+  record "1-board" "PASS" "GET / 200 lane tabs + Claim #1/Claim rank; ${board0_count} already-paid card(s) (not seeded by smoke)"
 else
   record "1-board" "FAIL" "GET / 200 but empty-lane contract broken"
 fi

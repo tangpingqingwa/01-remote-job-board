@@ -157,6 +157,13 @@ if [[ -f package.json ]]; then
     || fail "empty form must stamp Claim #1"
   grep -q 'data-empty-identity' src/components/board/bid-form.tsx \
     || fail "empty form must stamp its identity field"
+  grep -q 'aria-label="Claim rank"' src/components/board/bid-form.tsx \
+    || fail "bid form must expose the Claim rank action"
+  grep -q 'Claim rank' src/components/board/bid-form.tsx \
+    || fail "bid form must use Claim rank copy"
+  if grep -n 'Outbid' src/components/board/bid-form.tsx >/dev/null; then
+    fail "production bid form must not expose legacy Outbid copy"
+  fi
   grep -q 'data-lane-tabs' src/components/board/bid-form.tsx \
     || fail "empty form must expose one function selector"
   if grep -nE 'data-first-click="claim"|data-empty-identity-first|autoFocus=\{laneEmpty\}|Pick the function after Claim #1' \
@@ -167,7 +174,7 @@ if [[ -f package.json ]]; then
     src/components/board/board.tsx >/dev/null; then
     fail "empty board mast must not describe a staged claim-to-function hop"
   fi
-  grep -q 'empty lane form is a direct identity-and-function path before one Outbid submit' tests/rank.test.ts \
+  grep -q 'empty lane form is a direct identity-and-function path before one Claim rank submit' tests/rank.test.ts \
     || fail "rank tests must cover direct empty form order"
   grep -Fq 'claim\s*#1\s*,?\s*then\s+(?:pick|choose)' tests/rank.test.ts \
     || fail "rank tests must reject staged empty-board mast wording"

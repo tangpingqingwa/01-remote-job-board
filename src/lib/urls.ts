@@ -144,6 +144,43 @@ function hostnameOfHost(host: string): string {
     .replace(/^\.+/, "");
 }
 
+function hasUrlScheme(raw: string): boolean {
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) return false;
+
+  // A port on a scheme-less DNS name is part of the authority, not a custom
+  // URI scheme (`hartevo.com:8443` → `https://hartevo.com:8443`).
+  return !/^(?:(?:[a-z0-9-]+\.)+[a-z]{2,}|localhost|(?:\d{1,3}\.){3}\d{1,3}):\d+(?:[/?#]|$)/i.test(
+    raw,
+  );
+}
+
+function withHttpsScheme(raw: string): string {
+  return raw.startsWith("//")
+    ? `https:${raw}`
+    : hasUrlScheme(raw)
+      ? raw
+      : `https://${raw}`;
+}
+
+/**
+ * Company handles stay scheme-less, while a domain/path is a valid apply
+ * identity even when the employer omits the `https://` prefix. Keep this
+ * deliberately conservative so values such as `@company` remain handles.
+ */
+export function isUrlLikeApplyIdentity(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.startsWith("@")) return false;
+  if (hasUrlScheme(trimmed) || trimmed.startsWith("//")) return true;
+
+  const authority = trimmed.split(/[/?#]/, 1)[0] ?? "";
+  if (!authority) return false;
+  if (authority.includes(".")) return true;
+  return (
+    /^(?:localhost|(?:\d{1,3}\.){3}\d{1,3})(?::\d+)?$/i.test(authority) ||
+    /^\[[^\]]+\](?::\d+)?$/.test(authority)
+  );
+}
+
 function unresolvedShortener(): never {
   throw new UrlError("shortener_unresolved", "shortener could not be resolved");
 }
@@ -179,9 +216,10 @@ function parseAbsoluteUrl(raw: string): URL {
   if (!trimmed) {
     throw new UrlError("invalid_url", "apply URL is required");
   }
+  const candidate = withHttpsScheme(trimmed);
   let parsed: URL;
   try {
-    parsed = new URL(trimmed);
+    parsed = new URL(candidate);
   } catch {
     throw new UrlError("invalid_url", "apply URL is not a valid URL");
   }
@@ -216,8 +254,9 @@ export function formatCanonicalHttps(parsed: URL): string {
 }
 
 /**
- * Require https, resolve one documented shortener hop when a fixture/live
- * target is supplied, strip query + fragment, reject chat/NSFW/credentials.
+ * Require HTTPS (adding it when a scheme-less domain is supplied), resolve one
+ * documented shortener hop when a fixture/live target is supplied, strip
+ * query + fragment, and reject chat/NSFW/credentials.
  */
 export function canonicalizeApplyUrl(
   raw: string,
@@ -301,23 +340,26 @@ function defaultShortenerFetch(): ShortenerFetch {
 }
 
 function looksLikeAbsoluteUrl(raw: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:/i.test(raw);
+  return hasUrlScheme(raw);
 }
 
 /**
- * Resolve only a documented shortener input. Handles and direct HTTPS URLs
- * are returned untouched so checkout creation stays offline for them.
+ * Resolve only a documented shortener input. Handles and direct apply URLs
+ * (including bare domains) are returned without a network hop unless they are
+ * documented shorteners.
  */
 export async function resolveShortenerInput(
   raw: string,
   deps: ShortenerResolveDeps = {},
 ): Promise<string> {
   const trimmed = raw.trim();
-  if (!looksLikeAbsoluteUrl(trimmed)) return trimmed;
+  if (!isUrlLikeApplyIdentity(trimmed)) return trimmed;
+
+  const candidate = withHttpsScheme(trimmed);
 
   let parsed: URL;
   try {
-    parsed = new URL(trimmed);
+    parsed = new URL(candidate);
   } catch {
     return trimmed;
   }
@@ -327,7 +369,7 @@ export async function resolveShortenerInput(
   ) {
     return trimmed;
   }
-  return resolveShortenerHop(trimmed, deps);
+  return resolveShortenerHop(candidate, deps);
 }
 
 /**

@@ -282,21 +282,24 @@ a:hover {
 
 .claim h2 {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 0.5rem 0.65rem;
   margin: 0;
   font-family: var(--mono);
   font-size: clamp(1.45rem, 3.4vw, 2.05rem);
   letter-spacing: -0.04em;
   text-align: left;
+  white-space: nowrap;
 }
 
 .amount-stepper {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0.4rem;
+  white-space: nowrap;
 }
 
 .step {
@@ -312,13 +315,18 @@ a:hover {
 }
 
 .amount-field {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
   color: var(--primary);
   text-decoration: none;
   font-variant-numeric: tabular-nums;
 }
 
 .amount-field input {
-  width: 5.5ch;
+  width: auto;
+  min-width: 2ch;
+  max-width: 6ch;
   border: 0;
   background: transparent;
   color: inherit;
@@ -451,7 +459,7 @@ a:hover {
   font-weight: 400;
 }
 
-.claim[data-list-role] .outbid {
+.claim[data-list-role] .claim-submit {
   height: 2.35rem;
   padding: 0 1.05rem;
   font-size: 0.92rem;
@@ -462,7 +470,7 @@ a:hover {
   outline-offset: 2px;
 }
 
-.outbid {
+.claim-submit {
   height: 2.75rem;
   padding: 0 1.4rem;
   border: 0;
@@ -474,7 +482,7 @@ a:hover {
   cursor: pointer;
 }
 
-.outbid:hover {
+.claim-submit:hover {
   filter: brightness(0.95);
 }
 
@@ -1487,8 +1495,9 @@ input:focus-visible {
 .claim[data-list-role] h2,
 .claim[data-empty-honest] h2[data-empty-claim] {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
+  justify-content: center;
   gap: 8px 12px;
   margin: 0;
   color: var(--fg);
@@ -1498,12 +1507,15 @@ input:focus-visible {
   letter-spacing: -0.05em;
   line-height: 1.12;
   text-align: left;
+  white-space: nowrap;
 }
 
 .amount-stepper {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
 .step {
@@ -1531,6 +1543,7 @@ input:focus-visible {
 
 .amount-field {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   min-height: 44px;
   color: var(--pin);
@@ -1540,7 +1553,9 @@ input:focus-visible {
 }
 
 .amount-field input {
-  width: 6ch;
+  width: auto;
+  min-width: 2ch;
+  max-width: 6ch;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1762,7 +1777,7 @@ input:focus-visible {
   white-space: nowrap;
 }
 
-.outbid {
+.claim-submit {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1782,12 +1797,12 @@ input:focus-visible {
   box-shadow: 3px 3px 0 rgba(26, 33, 24, 0.2);
 }
 
-.outbid:hover:not(:disabled) {
+.claim-submit:hover:not(:disabled) {
   background: var(--fg);
   color: var(--sheet);
 }
 
-.outbid:disabled {
+.claim-submit:disabled {
   cursor: not-allowed;
   opacity: 0.48;
 }
@@ -2679,6 +2694,7 @@ input:focus-visible {
   .claim[data-list-role] h2,
   .claim[data-empty-honest] h2[data-empty-claim] {
     flex-wrap: nowrap;
+    justify-content: center;
     gap: 6px;
     font-size: 1.25rem;
     white-space: nowrap;
@@ -2721,7 +2737,7 @@ input:focus-visible {
     grid-column: 1;
   }
 
-  .outbid {
+  .claim-submit {
     grid-column: 2;
     min-width: 0;
     width: 100%;

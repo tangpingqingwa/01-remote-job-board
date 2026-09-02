@@ -147,6 +147,7 @@ export function BidForm({
               name="amount"
               inputMode="numeric"
               pattern="[0-9]*"
+              style={{ width: `${Math.max(2, String(amount).length)}ch` }}
               value={amount}
               onChange={(event) => {
                 const next = Number(event.target.value.replace(/[^\d]/g, ""));
@@ -265,7 +266,7 @@ export function BidForm({
             <input
               id="identity"
               name="identity"
-              placeholder="https://jobs.example.com/role or @company"
+              placeholder="https://jobs.example.com/role, hartevo.com, or @company"
               autoComplete="off"
               spellCheck={false}
               required
@@ -302,11 +303,12 @@ export function BidForm({
           )}
           <button
             type="submit"
-            className="outbid"
+            className="claim-submit"
+            aria-label="Claim rank"
             disabled={!ready}
             data-slot="claim-button"
           >
-            Outbid
+            Claim rank
           </button>
         </div>
         {laneEmpty ? null : (

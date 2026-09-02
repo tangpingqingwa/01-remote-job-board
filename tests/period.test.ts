@@ -360,7 +360,7 @@ test("paid placement stays live across Monday and expires after seven days", () 
   assert.doesNotMatch(html, /audit label|weekId/i);
   assert.match(html, /data-prize-title=""/);
   assert.match(html, />Apply</);
-  assert.match(html, />Outbid</);
+  assert.match(html, />Claim rank</);
   assert.doesNotMatch(html, /data-empty-window|data-first-click="claim"/);
 });
 
@@ -501,7 +501,7 @@ test("closed empty weeks are read-only and keep live claim controls out", () => 
   assert.match(html, /Open the live Backend wall for the rolling last 7 days/);
   assert.match(html, /class="wall-rail"/);
   assert.match(html, /Backend week history/);
-  assert.doesNotMatch(html, /data-bid-form|>Outbid<|data-empty-bay-list|data-first-click/);
+  assert.doesNotMatch(html, /data-bid-form|>Claim rank<|data-empty-bay-list|data-first-click/);
 });
 
 test("closed occupied weeks keep paid cards and facts but no live checkout", () => {
@@ -536,7 +536,7 @@ test("closed occupied weeks keep paid cards and facts but no live checkout", () 
   assert.match(html, /href="\/out\/lst_old"/);
   assert.match(html, /href="\/out\/lst_old_later"/);
   assert.match(html, /data-lane="backend"[^>]*>Backend week history</);
-  assert.doesNotMatch(html, /data-bid-form|>Outbid<|data-list-role|data-first-click="apply"/);
+  assert.doesNotMatch(html, /data-bid-form|>Claim rank<|data-list-role|data-first-click="apply"/);
 });
 
 test("closed-week unpaid rows stay off the wall", () => {
