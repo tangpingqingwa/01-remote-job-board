@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { FunctionLane } from "../../lib/types";
 import { FUNCTION_LANES, MAX_BID_USD, MIN_BID_USD } from "../../lib/types";
+import { isApplyIdentityReady } from "../../lib/urls";
 
 type BidFormProps = {
   lane: FunctionLane;
@@ -108,7 +109,7 @@ export function BidForm({
   const [selectedLane, setSelectedLane] = useState<FunctionLane>(lane);
   const listRole = !laneEmpty;
   const ready =
-    identity.trim().length > 0 &&
+    isApplyIdentityReady(identity) &&
     title.trim().length >= 3 &&
     company.trim().length >= 2 &&
     Boolean(selectedLane);

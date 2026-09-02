@@ -144,22 +144,129 @@ function hostnameOfHost(host: string): string {
     .replace(/^\.+/, "");
 }
 
-function hasUrlScheme(raw: string): boolean {
-  if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) return false;
+const URL_SCHEME_RE = /^([a-z][a-z0-9+.-]*):/i;
+const RAW_URL_CONTROL_RE = /[\p{Cc}\p{Cf}]/u;
+const DNS_LABEL_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
 
-  // A port on a scheme-less DNS name is part of the authority, not a custom
-  // URI scheme (`hartevo.com:8443` → `https://hartevo.com:8443`).
-  return !/^(?:(?:[a-z0-9-]+\.)+[a-z]{2,}|localhost|(?:\d{1,3}\.){3}\d{1,3}):\d+(?:[/?#]|$)/i.test(
-    raw,
+type AuthorityParts = {
+  host: string;
+  port?: string;
+};
+
+function invalidUrl(message: string): never {
+  throw new UrlError("invalid_url", message);
+}
+
+function validPort(port: string): boolean {
+  if (!/^\d{1,5}$/.test(port)) return false;
+  const value = Number(port);
+  return value >= 1 && value <= 65_535;
+}
+
+/** Parse only the authority syntax accepted by the scheme-less shorthand. */
+function authorityParts(raw: string): AuthorityParts | undefined {
+  const protocolRelative = raw.startsWith("//");
+  if (raw.startsWith("///") || (raw.startsWith("/") && !protocolRelative)) {
+    return undefined;
+  }
+
+  const withoutPrefix = protocolRelative ? raw.slice(2) : raw;
+  const authority = withoutPrefix.split(/[/?#]/, 1)[0] ?? "";
+  if (!authority || authority.includes("@") || /[\s\\%]/.test(authority)) {
+    return undefined;
+  }
+
+  if (authority.startsWith("[")) {
+    const close = authority.indexOf("]");
+    if (close < 2) return undefined;
+    const host = authority.slice(0, close + 1);
+    const suffix = authority.slice(close + 1);
+    if (suffix === "") return { host };
+    if (!suffix.startsWith(":") || !validPort(suffix.slice(1))) {
+      return undefined;
+    }
+    return { host, port: suffix.slice(1) };
+  }
+
+  if (authority.includes("[") || authority.includes("]")) return undefined;
+  const firstColon = authority.indexOf(":");
+  if (firstColon !== authority.lastIndexOf(":")) return undefined;
+  if (firstColon === -1) return { host: authority };
+
+  const host = authority.slice(0, firstColon);
+  const port = authority.slice(firstColon + 1);
+  if (!host || !validPort(port)) return undefined;
+  return { host, port };
+}
+
+function plausibleDnsHostname(host: string): boolean {
+  const canonical = host.toLowerCase().replace(/\.+$/, "");
+  if (
+    !canonical ||
+    canonical.startsWith(".") ||
+    canonical.includes("..") ||
+    canonical.length > 253
+  ) {
+    return false;
+  }
+  const labels = canonical.split(".");
+  return (
+    labels.length >= 2 &&
+    labels.every(
+      (label) =>
+        label.length > 0 && label.length <= 63 && DNS_LABEL_RE.test(label),
+    )
   );
 }
 
+function plausibleBareAuthority(raw: string): boolean {
+  if (!raw || RAW_URL_CONTROL_RE.test(raw) || raw.includes("\\")) {
+    return false;
+  }
+  const parts = authorityParts(raw);
+  if (!parts) return false;
+  const host = parts.host;
+  if (host.startsWith("[")) {
+    // The URL parser performs the exact IPv6 grammar check. Requiring a
+    // bracketed colon-bearing host keeps bare `::1` and malformed
+    // bracket authorities out of the fallback path.
+    return host.includes(":");
+  }
+  return host.toLowerCase() === "localhost" || plausibleDnsHostname(host);
+}
+
+/**
+ * Default only host-shaped input to HTTPS. Explicit schemes remain intact so
+ * the parser can reject every non-HTTPS protocol instead of upgrading it.
+ */
 function withHttpsScheme(raw: string): string {
-  return raw.startsWith("//")
-    ? `https:${raw}`
-    : hasUrlScheme(raw)
-      ? raw
-      : `https://${raw}`;
+  if (RAW_URL_CONTROL_RE.test(raw) || raw.includes("\\")) {
+    return invalidUrl("apply URL contains a control character or backslash");
+  }
+  if (raw.startsWith("//")) {
+    if (!plausibleBareAuthority(raw)) {
+      return invalidUrl("apply URL authority is malformed");
+    }
+    return `https:${raw}`;
+  }
+  if (raw.startsWith("/")) {
+    return invalidUrl("apply URL must include a host");
+  }
+  if (plausibleBareAuthority(raw)) return `https://${raw}`;
+
+  const scheme = URL_SCHEME_RE.exec(raw);
+  if (!scheme) return invalidUrl("apply URL must include a public host");
+  if (scheme[1]?.toLowerCase() === "https") {
+    const rest = raw.slice(scheme[0].length);
+    if (
+      !rest.startsWith("//") ||
+      rest.startsWith("///") ||
+      !authorityParts(rest)
+    ) {
+      return invalidUrl("apply URL must include a valid HTTPS authority");
+    }
+  }
+  return raw;
 }
 
 /**
@@ -170,15 +277,22 @@ function withHttpsScheme(raw: string): string {
 export function isUrlLikeApplyIdentity(raw: string): boolean {
   const trimmed = raw.trim();
   if (!trimmed || trimmed.startsWith("@")) return false;
-  if (hasUrlScheme(trimmed) || trimmed.startsWith("//")) return true;
+  if (
+    RAW_URL_CONTROL_RE.test(trimmed) ||
+    trimmed.includes("\\") ||
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("//") ||
+    URL_SCHEME_RE.test(trimmed)
+  ) {
+    return true;
+  }
 
   const authority = trimmed.split(/[/?#]/, 1)[0] ?? "";
   if (!authority) return false;
-  if (authority.includes(".")) return true;
-  return (
-    /^(?:localhost|(?:\d{1,3}\.){3}\d{1,3})(?::\d+)?$/i.test(authority) ||
-    /^\[[^\]]+\](?::\d+)?$/.test(authority)
-  );
+  if (plausibleBareAuthority(trimmed)) return true;
+  // Numeric-only authorities are not valid company handles when they are
+  // supplied as URL-shaped identities; route them through URL validation.
+  return /^(?:0x[0-9a-f]+|\d+)(?::|[/?#]|$)/i.test(authority);
 }
 
 function unresolvedShortener(): never {
@@ -211,10 +325,200 @@ export function isNsfwUrl(parsed: URL): boolean {
   return segments.some((segment) => NSFW_PATH_SEGMENTS.has(segment));
 }
 
+type Ipv4 = [number, number, number, number];
+
+function parseIpv4(host: string): Ipv4 | undefined {
+  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return undefined;
+  const octets = host.split(".").map(Number);
+  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+    return undefined;
+  }
+  return octets as Ipv4;
+}
+
+/** Decode the legacy decimal/hex/octal IPv4 spellings normalized by WHATWG. */
+function parseLegacyIpv4(host: string): Ipv4 | undefined {
+  const parts = host.split(".");
+  if (
+    parts.length < 1 ||
+    parts.length > 4 ||
+    parts.some((part) => !/^(?:0x[0-9a-f]+|[0-9]+)$/i.test(part))
+  ) {
+    return undefined;
+  }
+
+  const values = parts.map((part) => {
+    if (/^0x/i.test(part)) return Number.parseInt(part.slice(2), 16);
+    if (part.length > 1 && part.startsWith("0")) return Number.parseInt(part, 8);
+    return Number.parseInt(part, 10);
+  });
+  if (values.some((value) => !Number.isSafeInteger(value) || value < 0)) {
+    return undefined;
+  }
+
+  let address: number;
+  if (values.length === 1 && values[0] <= 0xffff_ffff) {
+    address = values[0];
+  } else if (values.length === 2 && values[0] <= 0xff && values[1] <= 0xff_ffff) {
+    address = values[0] * 0x1_00_00_00 + values[1];
+  } else if (
+    values.length === 3 &&
+    values[0] <= 0xff &&
+    values[1] <= 0xff &&
+    values[2] <= 0xffff
+  ) {
+    address = values[0] * 0x1_00_00_00 + values[1] * 0x1_00_00 + values[2];
+  } else if (values.length === 4 && values.every((value) => value <= 0xff)) {
+    address =
+      values[0] * 0x1_00_00_00 +
+      values[1] * 0x1_00_00 +
+      values[2] * 0x100 +
+      values[3];
+  } else {
+    return undefined;
+  }
+
+  return [
+    Math.floor(address / 0x1_00_00_00) % 0x100,
+    Math.floor(address / 0x1_00_00) % 0x100,
+    Math.floor(address / 0x100) % 0x100,
+    address % 0x100,
+  ];
+}
+
+/** RFC 6890, RFC 5737, RFC 6598, and other non-public IPv4 allocations. */
+function isPrivateOrReservedIpv4([first, second, third]: Ipv4): boolean {
+  if (first === 0 || first === 10 || first === 127 || first >= 224) return true;
+  if (first === 100 && second >= 64 && second <= 127) return true;
+  if (first === 169 && second === 254) return true;
+  if (first === 172 && second >= 16 && second <= 31) return true;
+  if (first === 192 && second === 0) return true;
+  if (first === 192 && second === 2) return true;
+  if (first === 192 && second === 31 && third === 196) return true;
+  if (first === 192 && second === 52 && third === 193) return true;
+  if (first === 192 && second === 88 && third === 99) return true;
+  if (first === 192 && second === 168) return true;
+  if (first === 198 && second >= 18 && second <= 19) return true;
+  if (first === 198 && second === 51 && third === 100) return true;
+  if (first === 203 && second === 0 && third === 113) return true;
+  return false;
+}
+
+function parseIpv6Words(host: string): number[] | undefined {
+  const halves = host.split("::");
+  if (halves.length > 2) return undefined;
+
+  const parseHalf = (half: string): number[] | undefined => {
+    if (!half) return [];
+    const words: number[] = [];
+    const groups = half.split(":");
+    for (const [index, group] of groups.entries()) {
+      if (group.includes(".")) {
+        const ipv4 = parseIpv4(group);
+        if (!ipv4 || index !== groups.length - 1) return undefined;
+        words.push((ipv4[0] << 8) | ipv4[1], (ipv4[2] << 8) | ipv4[3]);
+      } else {
+        if (!/^[0-9a-f]{1,4}$/i.test(group)) return undefined;
+        words.push(Number.parseInt(group, 16));
+      }
+    }
+    return words;
+  };
+
+  const left = parseHalf(halves[0] ?? "");
+  const right = parseHalf(halves.length === 2 ? halves[1] ?? "" : "");
+  if (!left || !right) return undefined;
+  if (halves.length === 1) return left.length === 8 ? left : undefined;
+  const zeroWords = 8 - left.length - right.length;
+  if (zeroWords < 1) return undefined;
+  return [
+    ...left,
+    ...Array.from({ length: zeroWords }, () => 0),
+    ...right,
+  ];
+}
+
+function isPrivateOrReservedIpv6(words: number[]): boolean {
+  if (words.length !== 8) return true;
+  const [a, b, c, d, e, f, g, h] = words;
+  const mappedIpv4: Ipv4 | undefined =
+    a === 0 && b === 0 && c === 0 && d === 0 && e === 0 && f === 0xffff
+      ? [g >> 8, g & 0xff, h >> 8, h & 0xff]
+      : undefined;
+  if (mappedIpv4 && isPrivateOrReservedIpv4(mappedIpv4)) return true;
+
+  if (
+    words.every((word) => word === 0) ||
+    (words.slice(0, 7).every((word) => word === 0) && h === 1) ||
+    (a === 0 && b === 0 && c === 0 && d === 0 && e === 0) ||
+    (a === 0x0064 && b === 0xff9b) // NAT64 / well-known translation prefix
+  ) {
+    return true;
+  }
+  if ((a & 0xfe00) === 0xfc00) return true; // fc00::/7 unique local
+  if ((a & 0xffc0) === 0xfe80) return true; // fe80::/10 link local
+  if ((a & 0xff00) === 0xff00) return true; // ff00::/8 multicast
+  if ((a & 0xffc0) === 0xfec0) return true; // fec0::/10 site local
+  if (a === 0x0100 && b === 0 && c === 0 && d === 0) return true; // discard
+  if (a === 0x2001 && b === 0) return true; // Teredo / protocol assignments
+  if (a === 0x2001 && b === 2 && c === 0) return true; // benchmarking
+  if (a === 0x2001 && (b & 0xfff0) === 0x0010) return true; // ORCHID
+  if (a === 0x2001 && b === 0xdb8) return true; // documentation
+  if (a === 0x2002) return true; // 6to4 transition space
+  return false;
+}
+
+function hasPrivateEmbeddedIpv4(host: string): boolean {
+  const labels = host.split(".");
+  for (let index = 0; index + 3 < labels.length; index += 1) {
+    const dotted = labels.slice(index, index + 4).join(".");
+    const ipv4 = parseIpv4(dotted) ?? parseLegacyIpv4(dotted);
+    if (ipv4 && isPrivateOrReservedIpv4(ipv4)) return true;
+  }
+  return labels.some((label) => {
+    const legacy = parseLegacyIpv4(label);
+    return legacy ? isPrivateOrReservedIpv4(legacy) : false;
+  });
+}
+
+/** True when a parsed destination is not a public, plausible host. */
+function isPrivateOrReservedHost(rawHost: string): boolean {
+  const raw = rawHost.toLowerCase().replace(/^\[|\]$/g, "");
+  const host = raw.replace(/\.+$/, "");
+  if (
+    !host ||
+    raw.startsWith(".") ||
+    host.includes("..") ||
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host === "home.arpa"
+  ) {
+    return true;
+  }
+
+  if (host.includes(":")) {
+    const words = parseIpv6Words(host);
+    return !words || isPrivateOrReservedIpv6(words);
+  }
+
+  const ipv4 = parseIpv4(host);
+  if (ipv4) return isPrivateOrReservedIpv4(ipv4);
+  if (parseLegacyIpv4(host)) return true;
+  return !plausibleDnsHostname(host) || hasPrivateEmbeddedIpv4(host);
+}
+
 function parseAbsoluteUrl(raw: string): URL {
   const trimmed = raw.trim();
   if (!trimmed) {
     throw new UrlError("invalid_url", "apply URL is required");
+  }
+  if (RAW_URL_CONTROL_RE.test(trimmed) || trimmed.includes("\\")) {
+    throw new UrlError(
+      "invalid_url",
+      "apply URL contains a control character or backslash",
+    );
   }
   const candidate = withHttpsScheme(trimmed);
   let parsed: URL;
@@ -228,6 +532,9 @@ function parseAbsoluteUrl(raw: string): URL {
   }
   if (parsed.username !== "" || parsed.password !== "") {
     throw new UrlError("invalid_url", "apply URL must not include credentials");
+  }
+  if (parsed.port && !validPort(parsed.port)) {
+    throw new UrlError("invalid_url", "apply URL port is invalid");
   }
   return parsed;
 }
@@ -292,8 +599,29 @@ export function canonicalizeApplyUrl(
   if (isNsfwUrl(parsed)) {
     throw new UrlError("nsfw_forbidden", "adult / NSFW apply URLs are not allowed");
   }
+  if (isPrivateOrReservedHost(parsed.hostname)) {
+    throw new UrlError(
+      "invalid_url",
+      "apply URL must point to a public destination",
+    );
+  }
 
   return formatCanonicalHttps(parsed);
+}
+
+/** Client-safe readiness check shared with the claim form. */
+export function isApplyIdentityReady(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  if (isUrlLikeApplyIdentity(trimmed)) {
+    try {
+      canonicalizeApplyUrl(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return /^[a-z0-9-]{2,32}$/i.test(trimmed);
 }
 
 /**
@@ -337,10 +665,6 @@ function defaultShortenerFetch(): ShortenerFetch {
   const globalFetch = globalThis.fetch;
   if (typeof globalFetch !== "function") unresolvedShortener();
   return (input, init) => globalFetch.call(globalThis, input, init);
-}
-
-function looksLikeAbsoluteUrl(raw: string): boolean {
-  return hasUrlScheme(raw);
 }
 
 /**

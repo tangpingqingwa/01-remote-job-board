@@ -13,6 +13,10 @@ import { FUNCTION_LANES } from "../src/lib/types";
 import { fixtureListing, specTieRows } from "./fixtures/listings";
 
 const cssSource = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+const bidFormSource = readFileSync(
+  join(process.cwd(), "src/components/board/bid-form.tsx"),
+  "utf8",
+);
 const WEEK_34 = "2026-W34";
 const WEEK_33 = "2026-W33";
 const RESET = "2026-08-24T00:00:00.000Z";
@@ -258,6 +262,7 @@ test("Claim rank amount controls stay centered and inline without legacy copy", 
   const html = renderBoard([]);
   assert.match(html, /class="claim-submit" aria-label="Claim rank"/);
   assert.doesNotMatch(html, /Outbid/);
+  assert.match(bidFormSource, /isApplyIdentityReady\(identity\)/);
   assert.match(
     cssSource,
     /\.claim h2,\s*\.claim\[data-list-role\] h2,[\s\S]*?flex-wrap:\s*nowrap;[\s\S]*?justify-content:\s*center;[\s\S]*?white-space:\s*nowrap;/,

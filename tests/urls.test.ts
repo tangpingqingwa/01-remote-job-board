@@ -12,6 +12,7 @@ import { rankListings } from "../src/lib/rank";
 import { BoardStore } from "../src/lib/store";
 import {
   canonicalizeApplyUrl,
+  isApplyIdentityReady,
   isLiveUrlResolveEnabled,
   outboundApplyUrl,
   resolveShortenerHop,
@@ -50,6 +51,24 @@ function assertUrlError(raw: string, code: UrlError["code"]) {
   });
 }
 
+function assertListingUrlError(raw: string, code = "invalid_url") {
+  assert.throws(() => listingApplyUrl(raw), (error: unknown) => {
+    assert.ok(error instanceof CheckoutError);
+    assert.equal(error.code, code);
+    assert.equal(error.httpStatus, 422);
+    return true;
+  });
+}
+
+function assertOutboundUrlError(raw: string, code: UrlError["code"] = "invalid_url") {
+  assert.throws(() => outboundApplyUrl(raw), (error: unknown) => {
+    assert.ok(error instanceof UrlError);
+    assert.equal(error.code, code);
+    assert.equal(error.httpStatus, 422);
+    return true;
+  });
+}
+
 afterEach(() => {
   resetFixtureIds();
 });
@@ -73,6 +92,7 @@ test("SPEC §6: strip query, fragment, tracking; normalize host/port/slash", () 
 
 test("scheme-less domains gain an https origin before canonicalization", () => {
   assert.equal(canonicalizeApplyUrl("hartevo.com"), "https://hartevo.com");
+  assert.equal(isApplyIdentityReady("hartevo.com"), true);
   assert.equal(
     canonicalizeApplyUrl("hartevo.com:8443/jobs"),
     "https://hartevo.com:8443/jobs",
@@ -97,6 +117,94 @@ test("scheme-less domains gain an https origin before canonicalization", () => {
   });
   assert.equal(draft.applyUrl, "https://hartevo.com");
   assert.equal(draft.companyHandle, "hartevo-com");
+});
+
+test("all URL boundaries reject malformed, obfuscated, and relative inputs", () => {
+  for (const raw of [
+    "0://evil.com",
+    "0x7f000001://evil.com",
+    "123://evil.com",
+    "javascript\\:alert(1)",
+    "http\\://evil.com",
+    "//\\evil.com",
+    "//evil.com\\path",
+    "javascript\n://evil.com",
+    "data\t://evil.com",
+    "ftp\r://evil.com",
+    "http\n://evil.com",
+    "/path",
+    "///example.com",
+    "////example.com/path",
+    "https:jobs.example.com/role",
+    "https:///jobs.example.com/role",
+    "https://jobs.example.com:0/role",
+    "jobs.example.com:65536/role",
+  ]) {
+    assertUrlError(raw, "invalid_url");
+    assertListingUrlError(raw);
+    assertOutboundUrlError(raw);
+    assert.equal(isApplyIdentityReady(raw), false, raw);
+  }
+});
+
+test("private, loopback, link-local, reserved, and local hosts fail at every URL boundary", () => {
+  for (const host of [
+    "0.0.0.0",
+    "10.0.0.1",
+    "100.64.0.1",
+    "127.0.0.1",
+    "169.254.1.1",
+    "172.16.0.1",
+    "192.0.0.1",
+    "192.0.2.1",
+    "192.168.1.1",
+    "198.18.0.1",
+    "198.51.100.1",
+    "203.0.113.1",
+    "224.0.0.1",
+    "127.0.0.1.nip.io",
+    "0x7f000001.nip.io",
+    "0177.0.0.1.nip.io",
+    "2130706433",
+    "0x7f000001",
+    "0177.0.0.1",
+    "[::]",
+    "[::1]",
+    "[::ffff:7f00:1]",
+    "[::ffff:0a00:1]",
+    "[fc00::1]",
+    "[fd12:3456::1]",
+    "[fe80::1]",
+    "[fec0::1]",
+    "[ff02::1]",
+    "[2001:db8::1]",
+    "localhost",
+    "localhost.",
+    "jobs.localhost",
+    "jobs.local",
+    "jobs.internal",
+  ]) {
+    for (const raw of [host, `${host}/role`, `//${host}/role`, `https://${host}/role`]) {
+      assertUrlError(raw, "invalid_url");
+      assertListingUrlError(raw);
+      assertOutboundUrlError(raw);
+      assert.equal(isApplyIdentityReady(raw), false, raw);
+    }
+  }
+});
+
+test("repeated trailing dots do not bypass shortener, chat, or NSFW deny lists", () => {
+  for (const [raw, code] of [
+    ["https://t.me../jobs", "chat_link_forbidden"],
+    ["https://acme.t.me.../jobs", "chat_link_forbidden"],
+    ["https://onlyfans.com.../creator", "nsfw_forbidden"],
+    ["https://bit.ly.../acme", "shortener_unresolved"],
+  ] as const) {
+    assertUrlError(raw, code);
+    assertListingUrlError(raw, code);
+    assertOutboundUrlError(raw, code);
+    assert.equal(isApplyIdentityReady(raw), false, raw);
+  }
 });
 
 test("https required; credentials, javascript, and data schemes are invalid_url", () => {
