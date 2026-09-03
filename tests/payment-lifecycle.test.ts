@@ -32,6 +32,7 @@ import { PaymentIntentStore } from "../src/payments/port";
 import { validateProductionStartup } from "../src/instrumentation-node";
 
 const PERIOD = "2026-W34";
+const EVENT_TIMESTAMP = new Date().toISOString();
 const MERCHANT = `MER_${"A".repeat(22)}`;
 const STORE = `STO_${"B".repeat(22)}`;
 const PRODUCT = `PROD_${"C".repeat(22)}`;
@@ -133,7 +134,7 @@ function signedEvent(input: {
 }): { body: string; signature: string } {
   const body = JSON.stringify({
     id: input.deliveryId,
-    timestamp: input.timestamp ?? "2026-08-27T00:00:00.000Z",
+    timestamp: input.timestamp ?? EVENT_TIMESTAMP,
     eventType: input.eventType ?? "order.completed",
     eventId: input.paymentId,
     storeId: input.storeId ?? STORE,
@@ -827,7 +828,7 @@ test("signed order.completed settles initial bid, preserves first paid tie, and 
   assert.ok(first);
   assert.equal(first.bidUsd, 5);
   assert.equal(first.paidUsd, 5);
-  assert.equal(first.createdAt, "2026-08-27T00:00:00.000Z");
+  assert.equal(first.createdAt, EVENT_TIMESTAMP);
   const replay = await handleWaffoWebhook(event.body, event.signature, webhookOptions(fixture));
   assert.equal(replay.status, "duplicate");
   assert.equal(fixture.store.listPaid("backend", PERIOD).length, 1);
