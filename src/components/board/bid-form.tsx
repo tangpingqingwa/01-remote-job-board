@@ -261,13 +261,13 @@ export function BidForm({
           {...(laneEmpty ? { "data-empty-identity": "" } : {})}
         >
           <label className="identity-label" htmlFor="identity">
-            Apply URL or company handle
+            Apply URL or bare company handle
           </label>
           <div className="identity-control">
             <input
               id="identity"
               name="identity"
-              placeholder="https://jobs.example.com/role, hartevo.com, or @company"
+              placeholder="https://jobs.example.com/role, hartevo.com, or acme"
               autoComplete="off"
               spellCheck={false}
               required
@@ -314,7 +314,7 @@ export function BidForm({
         </div>
         {laneEmpty ? null : (
           <p className="raise-hint">
-            Already on this lane? Enter the same apply URL or handle and raise.
+            Already on this lane? Enter the same apply URL or bare handle and raise.
             Returning employers pay only the difference when they raise the
             same listing.
           </p>

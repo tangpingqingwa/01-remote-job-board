@@ -213,6 +213,19 @@ test("empty lane form is a direct identity-and-function path before one Claim ra
   );
 });
 
+test("Claim rank identity copy only promises HTTPS URLs or bare handles", () => {
+  const emptyForm = formMarkup(renderBoard([]));
+  const occupiedForm = formMarkup(renderBoard());
+
+  assert.match(emptyForm, /Apply URL or bare company handle/);
+  assert.match(
+    emptyForm,
+    /placeholder="https:\/\/jobs\.example\.com\/role, hartevo\.com, or acme"/,
+  );
+  assert.doesNotMatch(emptyForm, /@company/);
+  assert.match(occupiedForm, /same apply URL or bare handle and raise/);
+});
+
 test("empty live homepage keeps claim, function rail, and empty bay in order", () => {
   const html = renderBoard([]);
   const rail = html.indexOf('data-slot="lane-rail"');
